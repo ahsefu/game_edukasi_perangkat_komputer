@@ -1,0 +1,2486 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TechMatch - Game Edukasi Perangkat Komputer</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tone.js untuk Musik Latar & Efek Suara Sintetis -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font-sans);
+      background: radial-gradient(circle at top left, #0f172a 0%, #1e1b4b 48%, #082f49 100%);
+      color: #0f172a;
+      overflow-x: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .font-mono-tech {
+      font-family: var(--font-mono);
+    }
+
+    /* Permukaan kartu perangkat bergaya studio 3D glossy */
+    .tech-card-surface {
+      background: linear-gradient(155deg, #ffffff 0%, #f8fafc 55%, #e0f2fe 100%);
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.22s ease, border-color 0.2s ease;
+      touch-action: none;
+      cursor: grab;
+    }
+
+    .tech-card-surface:active {
+      cursor: grabbing;
+    }
+
+    .tech-card-surface::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 25% 15%, rgba(255, 255, 255, 0.9) 0%, transparent 55%);
+      pointer-events: none;
+    }
+
+    .tech-card-surface::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg, transparent 25%, rgba(255, 255, 255, 0.85) 50%, transparent 75%);
+      transform: translateX(-120%);
+      transition: transform 0.65s ease;
+      pointer-events: none;
+    }
+
+    .tech-card-surface:hover {
+      transform: translateY(-4px) scale(1.03);
+      box-shadow: 0 14px 26px -6px rgba(14, 165, 233, 0.32), 0 4px 10px -2px rgba(15, 23, 42, 0.12);
+    }
+
+    .tech-card-surface:hover::after {
+      transform: translateX(120%);
+    }
+
+    /* State saat kartu sedang ditarik */
+    .card-dragging {
+      opacity: 0.45;
+      transform: scale(0.95);
+    }
+
+    /* Animasi getar & kembali saat kartu salah ditaruh */
+    @keyframes wrongShakeReturn {
+      0%, 100% { transform: translateX(0) scale(1); }
+      20% { transform: translateX(-9px) rotate(-3deg); }
+      40% { transform: translateX(9px) rotate(3deg); }
+      60% { transform: translateX(-6px) rotate(-2deg); }
+      80% { transform: translateX(6px) rotate(2deg); }
+    }
+
+    .animate-wrong-return {
+      animation: wrongShakeReturn 0.48s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+      border-color: #ef4444 !important;
+      background: linear-gradient(155deg, #fff1f2 0%, #ffe4e6 100%) !important;
+      box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25) !important;
+    }
+
+    /* Animasi pop masuk saat jawaban benar */
+    @keyframes correctPopIn {
+      0% { transform: scale(0.75); opacity: 0.3; }
+      65% { transform: scale(1.06); opacity: 1; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .animate-correct-pop {
+      animation: correctPopIn 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    }
+
+    /* Sorotan Bantuan 50:50 (2 Pilihan) */
+    @keyframes pulseHintGold {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.55); }
+      50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); }
+    }
+
+    .hint-target-card {
+      border-color: #f59e0b !important;
+      background: linear-gradient(155deg, #fffbeb 0%, #fef3c7 100%) !important;
+      animation: pulseHintGold 1.4s infinite;
+    }
+
+    .hint-zone-active {
+      border-color: #f59e0b !important;
+      background: linear-gradient(180deg, #fffbeb 0%, #fef3c7 100%) !important;
+      box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.32), 0 12px 24px -6px rgba(245, 158, 11, 0.35) !important;
+      transform: scale(1.02);
+    }
+
+    .hint-zone-dimmed {
+      opacity: 0.35;
+      filter: grayscale(0.65);
+      pointer-events: none;
+    }
+
+    /* Area Drop Interaktif */
+    .drop-zone {
+      transition: all 0.2s ease;
+    }
+
+    .drop-zone.drag-over {
+      border-color: #0284c7 !important;
+      background-color: #e0f2fe !important;
+      transform: scale(1.025);
+      box-shadow: 0 10px 25px -5px rgba(2, 132, 199, 0.3);
+    }
+
+    /* Floating Touch Ghost */
+    #touch-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      transform: translate(-50%, -50%) scale(1.08) rotate(3deg);
+      filter: drop-shadow(0 18px 25px rgba(15, 23, 42, 0.4));
+      display: none;
+    }
+
+    /* Custom scrollbar halus */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.2);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(148, 163, 184, 0.5);
+      border-radius: 999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.8);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col relative">
+
+  <!-- Canvas Latar Belakang Animasi Sirkuit & Partikel Teknologi -->
+  <canvas id="bg-canvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+
+  <!-- Canvas Konfeti Selebrasi -->
+  <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50"></canvas>
+
+  <!-- Elemen Bayangan Kartu saat Drag via Layar Sentuh (Mobile/Tablet) -->
+  <div id="touch-ghost" class="w-28 h-28 rounded-2xl bg-white/95 border-2 border-sky-500 p-2 flex flex-col items-center justify-center"></div>
+
+  <!-- ===================================================================== -->
+  <!-- LAYAR 1: LOGIN NAMA PEMAIN & PETUNJUK PERMAINAN                       -->
+  <!-- ===================================================================== -->
+  <main id="login-screen" class="relative z-10 flex-1 flex items-center justify-center p-4 sm:p-6">
+    <div class="w-full max-w-4xl bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/60 overflow-hidden grid grid-cols-1 lg:grid-cols-12">
+
+      <!-- Kolom Kiri: Form Login & Identitas Game -->
+      <div class="lg:col-span-5 bg-gradient-to-br from-slate-900 via-indigo-950 to-sky-900 text-white p-6 sm:p-8 flex flex-col justify-between relative overflow-hidden">
+        <div class="absolute -top-16 -right-16 w-48 h-48 bg-sky-500/20 rounded-full blur-2xl pointer-events-none"></div>
+        <div class="absolute -bottom-16 -left-16 w-48 h-48 bg-indigo-500/25 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div>
+          <div class="flex flex-wrap items-center gap-2 mb-4">
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-200 text-xs font-bold tracking-wide">
+              <span>⚡</span> GAME EDUKASI INFORMATIKA
+            </div>
+            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-400/40 text-amber-200 text-xs font-bold tracking-wide">
+              <span>👨‍💻</span> Author: Ahmad Saifudin
+            </div>
+          </div>
+          <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight leading-tight">
+            Tech<span class="text-sky-400">Match</span>
+          </h1>
+          <p class="mt-2 text-slate-300 text-sm leading-relaxed">
+            Uji ketangkasan dan pengetahuanmu mengenal perangkat keras (Hardware) & perangkat lunak (Software) komputer dalam tantangan 4 Stage interaktif!
+          </p>
+        </div>
+
+        <!-- Form Input Nama -->
+        <form id="login-form" class="mt-6 space-y-4 relative z-10">
+          <div>
+            <label for="player-name-input" class="block text-xs font-bold uppercase tracking-wider text-sky-200 mb-1.5">
+              Masukkan Nama Pemain
+            </label>
+            <input
+              id="player-name-input"
+              type="text"
+              maxlength="24"
+              placeholder="Contoh: Budi Santoso"
+              autocomplete="off"
+              class="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/25 text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:bg-white/15 font-semibold transition"
+            />
+            <p id="login-error" class="hidden mt-1.5 text-xs font-semibold text-rose-300">
+              ⚠️ Silakan masukkan namamu terlebih dahulu sebelum mulai bermain.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            class="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-sky-400 to-blue-600 hover:from-sky-300 hover:to-blue-500 text-slate-950 font-extrabold text-sm sm:text-base shadow-lg shadow-sky-500/30 transform hover:-translate-y-0.5 active:translate-y-0 transition flex items-center justify-center gap-2"
+          >
+            <span>🚀</span> MULAI PETUALANGAN
+          </button>
+        </form>
+        <div class="mt-6 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+          <span class="flex items-center gap-1.5">⏱️ Waktu: <strong class="text-white">3 Menit</strong></span>
+          <span class="flex items-center gap-1.5">❤️ Nyawa: <strong class="text-rose-400">3 Nyawa</strong></span>
+          <span class="flex items-center gap-1 text-sky-300 font-semibold">© Ahmad Saifudin</span>
+        </div>
+      </div>
+
+      <!-- Kolom Kanan: Petunjuk Permainan Lengkap -->
+      <div class="lg:col-span-7 p-6 sm:p-8 flex flex-col justify-between bg-slate-50/90">
+        <div>
+          <div class="flex items-center gap-2.5 mb-4">
+            <span class="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-extrabold text-lg">📖</span>
+            <div>
+              <h2 class="text-lg sm:text-xl font-extrabold text-slate-800">Petunjuk Permainan</h2>
+              <p class="text-xs text-slate-500">Pahami aturan main sebelum memulai tantangan</p>
+            </div>
+          </div>
+
+          <div class="space-y-3 text-xs sm:text-sm text-slate-700">
+            <div class="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-start gap-3">
+              <span class="w-7 h-7 rounded-lg bg-sky-100 text-sky-700 font-extrabold flex items-center justify-center shrink-0">1</span>
+              <div>
+                <p class="font-bold text-slate-800">Cara Bermain (Drag & Drop / Tap)</p>
+                <p class="text-slate-600 mt-0.5">Tarik (seret) kartu gambar perangkat komputer ke kotak tujuan yang tepat. Di layar sentuh, kamu juga bisa <strong>ketuk kartu</strong> lalu <strong>ketuk kotak tujuan</strong>. Jika salah, kartu otomatis kembali ke dek asal.</p>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-2xl bg-white border border-slate-200/80 shadow-sm flex items-start gap-3">
+              <span class="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-extrabold flex items-center justify-center shrink-0">2</span>
+              <div>
+                <p class="font-bold text-slate-800">4 Tahapan Tantangan (Stage)</p>
+                <ul class="text-slate-600 mt-1 space-y-1 list-disc list-inside">
+                  <li><strong>Stage 1:</strong> Tebak <em>Nama Perangkat</em> dari gambar kartu (12 perangkat).</li>
+                  <li><strong>Stage 2:</strong> Jodohkan <em>Fungsi Perangkat</em> dengan kartu yang sesuai.</li>
+                  <li><strong>Stage 3:</strong> Kelompokkan gambar (tanpa nama) ke <em>Software</em> & <em>Hardware</em>.</li>
+                  <li><strong>Stage 4:</strong> Kelompokkan gambar (tanpa nama) ke <em>Input</em>, <em>Proses</em>, & <em>Output</em>.</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div class="p-3 rounded-2xl bg-rose-50/80 border border-rose-200/80">
+                <p class="font-bold text-rose-800 flex items-center gap-1.5">❤️ Sistem Nyawa & Bonus</p>
+                <p class="text-xs text-rose-700 mt-1">Mulai dengan <strong>3 nyawa</strong>. Jawaban salah mengurangi 1 nyawa. Selesaikan <strong>Stage 1 & Stage 2</strong> untuk mendapat <strong>+1 nyawa tambahan</strong>!</p>
+              </div>
+              <div class="p-3 rounded-2xl bg-amber-50/80 border border-amber-200/80">
+                <p class="font-bold text-amber-800 flex items-center gap-1.5">💡 2 Bantuan (1x Pakai)</p>
+                <p class="text-xs text-amber-700 mt-1">Gunakan <strong>50:50 (2 Pilihan)</strong> untuk menyaring 1 jawaban benar & 1 pengecoh, atau <strong>+30 Detik</strong> untuk menambah waktu!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 pt-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+          <span>🎧 Aktifkan suara untuk pengalaman musik & efek terbaik</span>
+          <span class="font-bold text-indigo-600">4 Stage • 3 Menit</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===================================================================== -->
+  <!-- LAYAR 2: ARENA PERMAINAN UTAMA                                        -->
+  <!-- ===================================================================== -->
+  <section id="game-screen" class="relative z-10 hidden flex-1 flex flex-col max-w-7xl w-full mx-auto px-3 sm:px-5 py-3 gap-3">
+
+    <!-- Top HUD Bar -->
+    <header class="bg-white/95 backdrop-blur-md rounded-2xl shadow-lg border border-white/70 px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+      <!-- Info Pemain & Stage -->
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-600 text-white font-extrabold flex items-center justify-center text-base shadow">
+          <span id="hud-avatar">P</span>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="hud-player-name" class="font-extrabold text-slate-800 text-sm sm:text-base">Pemain</span>
+            <span id="hud-stage-badge" class="px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-xs font-extrabold">
+              Stage 1 / 4
+            </span>
+          </div>
+          <p id="hud-stage-title" class="text-xs text-slate-500 font-medium">Tebak Nama Perangkat Komputer</p>
+        </div>
+      </div>
+
+      <!-- Status Nyawa, Skor, Waktu & Bantuan -->
+      <div class="flex flex-wrap items-center gap-2 sm:gap-2.5">
+        <!-- Nyawa -->
+        <div class="bg-rose-50 border border-rose-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5" title="Sisa Nyawa">
+          <span class="text-[11px] font-bold text-rose-600 uppercase">Nyawa</span>
+          <div id="hud-lives" class="flex items-center gap-0.5 text-sm sm:text-base">❤️❤️❤️</div>
+        </div>
+
+        <!-- Skor -->
+        <div class="bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl text-center" title="Skor Saat Ini">
+          <span class="block text-[10px] font-bold text-emerald-600 uppercase leading-none">Skor</span>
+          <span id="hud-score" class="text-xs sm:text-sm font-extrabold text-emerald-700 font-mono-tech mt-0.5 block">0</span>
+        </div>
+
+        <!-- Timer 3 Menit -->
+        <div id="timer-box" class="bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-xl text-center transition-colors" title="Sisa Waktu">
+          <span class="block text-[10px] font-bold text-sky-600 uppercase leading-none">Waktu</span>
+          <span id="hud-timer" class="text-xs sm:text-sm font-extrabold text-sky-700 font-mono-tech mt-0.5 block">03:00</span>
+        </div>
+
+        <!-- Tombol Bantuan 1: 2 Pilihan (50:50) -->
+        <button
+          id="btn-hint-5050"
+          type="button"
+          title="Bantuan 50:50: Pilih di antara 2 pilihan (1 jawaban benar). Hanya 1x pakai!"
+          class="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95"
+        >
+          <span>🎯</span>
+          <span class="hidden sm:inline">2 Pilihan</span>
+          <span class="px-1.5 py-0.2 rounded bg-amber-500 text-white text-[10px]">1x</span>
+        </button>
+
+        <!-- Tombol Bantuan 2: +30 Detik -->
+        <button
+          id="btn-hint-time"
+          type="button"
+          title="Bantuan Waktu: Perpanjang waktu +30 detik. Hanya 1x pakai!"
+          class="px-2.5 py-1.5 rounded-xl bg-teal-100 hover:bg-teal-200 border border-teal-300 text-teal-900 text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95"
+        >
+          <span>⏳</span>
+          <span class="hidden sm:inline">+30 Detik</span>
+          <span class="px-1.5 py-0.2 rounded bg-teal-600 text-white text-[10px]">1x</span>
+        </button>
+
+        <!-- Kontrol Utilitas: Petunjuk, Musik & Efek Suara -->
+        <div class="flex items-center gap-1">
+          <button
+            id="btn-open-help"
+            type="button"
+            title="Petunjuk Permainan"
+            class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-sm flex items-center justify-center transition"
+          >
+            ?
+          </button>
+          <button
+            id="btn-toggle-music"
+            type="button"
+            title="Musik Latar"
+            class="w-9 h-9 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm flex items-center justify-center transition"
+          >
+            🎵
+          </button>
+          <button
+            id="btn-toggle-sound"
+            type="button"
+            title="Efek Suara"
+            class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm flex items-center justify-center transition"
+          >
+            🔊
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Banner Apresiasi & Umpan Balik Jawaban -->
+    <div id="feedback-banner" class="rounded-2xl px-4 py-2.5 bg-white/90 backdrop-blur-md border border-slate-200 shadow-sm flex items-center justify-between gap-3 transition-all">
+      <div class="flex items-center gap-3">
+        <span id="feedback-icon" class="text-xl sm:text-2xl">💡</span>
+        <div>
+          <p id="feedback-title" class="text-xs sm:text-sm font-extrabold text-slate-800">Siap Bermain!</p>
+          <p id="feedback-desc" class="text-xs text-slate-600">Tarik gambar perangkat komputer ke area drop yang sesuai.</p>
+        </div>
+      </div>
+      <div class="hidden md:flex items-center gap-2 shrink-0">
+        <span class="text-xs font-bold text-slate-500">Progres Stage:</span>
+        <span id="stage-progress-text" class="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 font-mono-tech text-xs font-extrabold">0 / 12</span>
+      </div>
+    </div>
+
+    <!-- Dek Kartu Perangkat (Kolom Asal) -->
+    <div class="bg-white/90 backdrop-blur-md rounded-2xl p-3 sm:p-4 border border-white/70 shadow-lg">
+      <div class="flex items-center justify-between mb-2.5">
+        <div class="flex items-center gap-2">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping"></span>
+          <h2 class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-slate-700">
+            Dek Kartu Perangkat (<span id="deck-remaining-count">12</span> Tersisa)
+          </h2>
+        </div>
+        <span id="deck-hint-label" class="text-[11px] font-semibold text-slate-500">
+          Tarik kartu atau ketuk kartu lalu ketuk tujuan
+        </span>
+      </div>
+
+      <div id="card-deck" class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2 sm:gap-2.5 min-h-[104px]">
+        <!-- Kartu perangkat dirender secara dinamis di sini -->
+      </div>
+    </div>
+
+    <!-- Area Tujuan Drop (Berubah Sesuai Stage 1 - 4) -->
+    <div class="flex-1 bg-white/92 backdrop-blur-md rounded-2xl p-3 sm:p-4 border border-white/70 shadow-xl flex flex-col">
+      <div class="flex items-center justify-between mb-3">
+        <h2 id="drop-area-heading" class="text-xs sm:text-sm font-extrabold uppercase tracking-wider text-indigo-800 flex items-center gap-2">
+          <span>🎯</span> Area Penempatan Kartu
+        </h2>
+        <span id="no-name-badge" class="hidden px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">
+          Mode Gambar Tanpa Nama
+        </span>
+      </div>
+
+      <div id="drop-zones-container" class="flex-1 grid gap-2.5 sm:gap-3">
+        <!-- Area drop dirender dinamis di sini -->
+      </div>
+    </div>
+
+    <!-- Footer Author -->
+    <footer class="bg-slate-900/75 backdrop-blur-md border border-white/15 rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-300">
+      <span class="font-semibold text-sky-300">⚡ TechMatch — Media Pembelajaran Interaktif Perangkat Komputer</span>
+      <span class="font-bold text-white flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+        Author: <span class="text-amber-300">Ahmad Saifudin</span>
+      </span>
+    </footer>
+  </section>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL PETUNJUK PERMAINAN (SAAT BERMAIN)                                -->
+  <!-- ===================================================================== -->
+  <div id="help-modal" class="fixed inset-0 z-50 hidden bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
+      <div class="flex items-center justify-between pb-3 border-b border-slate-200">
+        <h3 class="text-lg font-extrabold text-slate-800 flex items-center gap-2">
+          <span>📖</span> Panduan Singkat TechMatch
+        </h3>
+        <button id="btn-close-help" type="button" class="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold">✕</button>
+      </div>
+      <div class="mt-4 space-y-2.5 text-xs sm:text-sm text-slate-600">
+        <p>• <strong>Tarik & Lepas (Drag & Drop):</strong> Seret kartu gambar perangkat dari dek atas menuju kotak tujuan yang cocok.</p>
+        <p>• <strong>Alternatif Layar Sentuh:</strong> Ketuk kartu hingga tepinya menyala biru, lalu ketuk kotak tujuan.</p>
+        <p>• <strong>Bonus Nyawa:</strong> Menyelesaikan <strong>Stage 1</strong> dan <strong>Stage 2</strong> masing-masing memberikan <strong>+1 Nyawa Tambahan</strong>!</p>
+        <p>• <strong>Stage 3 & Stage 4:</strong> Kartu hanya menampilkan gambar tanpa nama untuk menguji ketajaman ingatanmu.</p>
+        <p>• <strong>Bantuan (1x pakai):</strong> Gunakan <em>2 Pilihan</em> untuk menyaring 1 jawaban benar & 1 pengecoh, atau <em>+30 Detik</em> untuk tambahan waktu.</p>
+      </div>
+      <button id="btn-ok-help" type="button" class="mt-5 w-full py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition">
+        Mengerti, Lanjutkan!
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL TRANSISI ANTAR STAGE (+1 NYAWA PADA STAGE 1 & 2)                -->
+  <!-- ===================================================================== -->
+  <div id="stage-modal" class="fixed inset-0 z-50 hidden bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 text-center shadow-2xl border border-white">
+      <div id="stage-modal-icon" class="w-16 h-16 mx-auto rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-3xl shadow-inner mb-3">
+        🎉
+      </div>
+      <h3 id="stage-modal-title" class="text-xl sm:text-2xl font-extrabold text-slate-800">Stage 1 Selesai!</h3>
+      <p id="stage-modal-desc" class="mt-2 text-sm text-slate-600">Hebat! Kamu berhasil mencocokkan semua perangkat komputer.</p>
+
+      <div id="stage-bonus-pill" class="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 font-extrabold text-sm">
+        <span>❤️</span> Bonus +1 Nyawa Tambahan!
+      </div>
+
+      <button
+        id="btn-next-stage"
+        type="button"
+        class="mt-6 w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-500 hover:to-sky-500 text-white font-extrabold text-sm sm:text-base shadow-lg transition"
+      >
+        Lanjut ke Stage Berikutnya ➡️
+      </button>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL AKHIR PERMAINAN (MENANG / KALAH)                                -->
+  <!-- ===================================================================== -->
+  <div id="end-modal" class="fixed inset-0 z-50 hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 text-center shadow-2xl border border-white">
+      <div id="end-modal-icon" class="w-20 h-20 mx-auto rounded-3xl bg-amber-100 text-amber-500 flex items-center justify-center text-4xl shadow-md mb-4">
+        🏆
+      </div>
+      <h3 id="end-modal-title" class="text-2xl font-extrabold text-slate-800">Selamat, Juara!</h3>
+      <p id="end-modal-subtitle" class="mt-1.5 text-sm text-slate-600">Kamu telah menaklukkan seluruh tantangan TechMatch!</p>
+
+      <div class="mt-5 grid grid-cols-3 gap-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+        <div>
+          <span class="block text-[10px] font-bold uppercase text-slate-400">Skor Akhir</span>
+          <span id="end-score" class="text-lg font-extrabold text-emerald-600 font-mono-tech">0</span>
+        </div>
+        <div>
+          <span class="block text-[10px] font-bold uppercase text-slate-400">Sisa Nyawa</span>
+          <span id="end-lives" class="text-lg font-extrabold text-rose-600 font-mono-tech">3</span>
+        </div>
+        <div>
+          <span class="block text-[10px] font-bold uppercase text-slate-400">Sisa Waktu</span>
+          <span id="end-time" class="text-lg font-extrabold text-sky-600 font-mono-tech">00:00</span>
+        </div>
+      </div>
+
+      <button
+        id="btn-restart-game"
+        type="button"
+        class="mt-6 w-full py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-extrabold text-sm sm:text-base shadow-lg transition"
+      >
+        🔄 Main Lagi
+      </button>
+
+      <p class="mt-4 text-[11px] font-semibold text-slate-400">
+        Dikembangkan oleh <span class="text-slate-700 font-extrabold">Ahmad Saifudin</span> • TechMatch EduGame
+      </p>
+    </div>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- LOGIKA PERMAINAN, ILUSTRASI SVG REALISTIS & AUDIO ENGINE              -->
+  <!-- ===================================================================== -->
+  <script>
+    /**
+     * 1. BASIS DATA PERANGKAT KOMPUTER (HARDWARE & SOFTWARE)
+     */
+    const DEVICES = {
+      keyboard: {
+        id: 'keyboard',
+        name: 'Keyboard',
+        func: 'Memasukkan data berupa huruf, angka, simbol, dan perintah ketikan ke komputer.',
+        type: 'hardware',
+        ipo: 'input'
+      },
+      mouse: {
+        id: 'mouse',
+        name: 'Mouse',
+        func: 'Menggerakkan kursor/pointer di layar serta memilih objek melalui klik dan gulir.',
+        type: 'hardware',
+        ipo: 'input'
+      },
+      microphone: {
+        id: 'microphone',
+        name: 'Microphone',
+        func: 'Menangkap gelombang suara analog dan mengubahnya menjadi sinyal audio digital.',
+        type: 'hardware',
+        ipo: 'input'
+      },
+      barcode_scanner: {
+        id: 'barcode_scanner',
+        name: 'Barcode Scanner',
+        func: 'Memindai kode batang (barcode) menggunakan sensor optik menjadi data produk.',
+        type: 'hardware',
+        ipo: 'input'
+      },
+      ram: {
+        id: 'ram',
+        name: 'RAM',
+        func: 'Menyimpan data dan instruksi aplikasi sementara secara cepat saat komputer aktif.',
+        type: 'hardware',
+        ipo: 'proses'
+      },
+      rom: {
+        id: 'rom',
+        name: 'ROM',
+        func: 'Menyimpan firmware permanen (BIOS/UEFI) untuk proses booting awal komputer.',
+        type: 'hardware',
+        ipo: 'proses'
+      },
+      ssd: {
+        id: 'ssd',
+        name: 'SSD',
+        func: 'Media penyimpanan berkecepatan tinggi berbasis chip memori flash tanpa piringan mekanik.',
+        type: 'hardware',
+        ipo: 'proses'
+      },
+      hard_disk: {
+        id: 'hard_disk',
+        name: 'Hard Disk',
+        func: 'Menyimpan sistem operasi dan file berkapasitas besar menggunakan piringan magnetik.',
+        type: 'hardware',
+        ipo: 'proses'
+      },
+      speaker: {
+        id: 'speaker',
+        name: 'Speaker',
+        func: 'Mengubah sinyal audio digital dari komputer menjadi gelombang suara yang terdengar.',
+        type: 'hardware',
+        ipo: 'output'
+      },
+      lcd_monitor: {
+        id: 'lcd_monitor',
+        name: 'LCD Monitor',
+        func: 'Menampilkan antarmuka grafis, teks, gambar, dan video secara visual kepada pengguna.',
+        type: 'hardware',
+        ipo: 'output'
+      },
+      printer: {
+        id: 'printer',
+        name: 'Printer',
+        func: 'Mencetak dokumen teks maupun gambar digital ke atas media kertas (hardcopy).',
+        type: 'hardware',
+        ipo: 'output'
+      },
+      lcd_proyektor: {
+        id: 'lcd_proyektor',
+        name: 'LCD Proyektor',
+        func: 'Memancarkan tampilan layar komputer ke bidang layar lebar atau dinding presentasi.',
+        type: 'hardware',
+        ipo: 'output'
+      },
+      ms_word: {
+        id: 'ms_word',
+        name: 'Microsoft Word',
+        func: 'Perangkat lunak pengolah kata untuk membuat surat, laporan, dan dokumen teks.',
+        type: 'software',
+        ipo: null
+      },
+      windows: {
+        id: 'windows',
+        name: 'Windows',
+        func: 'Sistem operasi utama yang mengelola seluruh sumber daya perangkat keras dan lunak.',
+        type: 'software',
+        ipo: null
+      },
+      google_chrome: {
+        id: 'google_chrome',
+        name: 'Google Chrome',
+        func: 'Perangkat lunak peramban web (browser) untuk menjelajahi halaman internet.',
+        type: 'software',
+        ipo: null
+      },
+      samadav: {
+        id: 'samadav',
+        name: 'Samadav',
+        func: 'Perangkat lunak antivirus lokal untuk melindungi komputer dari virus dan malware USB.',
+        type: 'software',
+        ipo: null
+      }
+    };
+
+    const STAGE12_IDS = [
+      'keyboard', 'mouse', 'microphone', 'barcode_scanner',
+      'ram', 'rom', 'ssd', 'hard_disk',
+      'speaker', 'lcd_monitor', 'printer', 'lcd_proyektor'
+    ];
+
+    const STAGE3_IDS = [
+      'ms_word', 'windows', 'google_chrome', 'samadav',
+      'lcd_monitor', 'speaker', 'keyboard', 'mouse'
+    ];
+
+    const STAGE4_IDS = [...STAGE12_IDS];
+
+    /**
+     * 2. ILUSTRASI VEKTOR REALISTIS & BERDETAIL TINGGI (SVG 3D-SHADED)
+     */
+    function getDeviceSVG(id) {
+      switch (id) {
+        case 'keyboard':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="kb-body" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#334155"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+                <linearGradient id="kb-key" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="100%" stop-color="#cbd5e1"/>
+                </linearGradient>
+                <linearGradient id="kb-rgb" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#38bdf8"/>
+                  <stop offset="50%" stop-color="#818cf8"/>
+                  <stop offset="100%" stop-color="#f472b6"/>
+                </linearGradient>
+              </defs>
+              <!-- Kabel Braided USB -->
+              <path d="M60 15 C60 7, 74 9, 77 3" fill="none" stroke="#334155" stroke-width="3" stroke-linecap="round"/>
+              <!-- Alas Bayangan & Rangka Aluminium CNC -->
+              <rect x="6" y="18" width="108" height="54" rx="8" fill="#020617" opacity="0.4"/>
+              <rect x="6" y="14" width="108" height="54" rx="8" fill="url(#kb-body)" stroke="#64748b" stroke-width="1.3"/>
+              <!-- Strip Cahaya RGB Bawah -->
+              <rect x="10" y="64" width="100" height="2.4" rx="1.2" fill="url(#kb-rgb)"/>
+              <!-- Lampu Indikator Num/Caps/Scroll -->
+              <circle cx="97" cy="19.5" r="1.4" fill="#22c55e"/>
+              <circle cx="102" cy="19.5" r="1.4" fill="#38bdf8"/>
+              <circle cx="107" cy="19.5" r="1.4" fill="#f59e0b"/>
+              <!-- Baris Tombol Fungsi -->
+              <g fill="url(#kb-key)">
+                <rect x="12" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="22" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="32" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="42" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="52" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="62" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="72" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="82" y="23" width="8" height="7" rx="1.5"/>
+                <rect x="92" y="23" width="16" height="7" rx="1.5" fill="#94a3b8"/>
+              </g>
+              <!-- Baris QWERTY -->
+              <g fill="url(#kb-key)">
+                <rect x="12" y="33" width="11" height="7" rx="1.5" fill="#94a3b8"/>
+                <rect x="25" y="33" width="8" height="7" rx="1.5"/>
+                <rect x="35" y="33" width="8" height="7" rx="1.5"/>
+                <rect x="45" y="33" width="8" height="7" rx="1.5"/>
+                <rect x="55" y="33" width="8" height="7" rx="1.5"/>
+                <rect x="65" y="33" width="8" height="7" rx="1.5"/>
+                <rect x="75" y="33" width="8" height="7" rx="1.5"/>
+                <rect x="85" y="33" width="8" height="7" rx="1.5"/>
+                <rect x="95" y="33" width="13" height="7" rx="1.5" fill="#38bdf8"/>
+              </g>
+              <!-- Baris ASDF -->
+              <g fill="url(#kb-key)">
+                <rect x="12" y="43" width="13" height="7" rx="1.5" fill="#94a3b8"/>
+                <rect x="27" y="43" width="8" height="7" rx="1.5"/>
+                <rect x="37" y="43" width="8" height="7" rx="1.5"/>
+                <rect x="47" y="43" width="8" height="7" rx="1.5"/>
+                <rect x="57" y="43" width="8" height="7" rx="1.5"/>
+                <rect x="67" y="43" width="8" height="7" rx="1.5"/>
+                <rect x="77" y="43" width="8" height="7" rx="1.5"/>
+                <rect x="87" y="43" width="21" height="7" rx="1.5" fill="#6366f1"/>
+              </g>
+              <!-- Baris Spasi & Modifier -->
+              <g fill="url(#kb-key)">
+                <rect x="12" y="53" width="10" height="7" rx="1.5" fill="#94a3b8"/>
+                <rect x="24" y="53" width="10" height="7" rx="1.5" fill="#94a3b8"/>
+                <rect x="36" y="53" width="44" height="7" rx="1.5"/>
+                <rect x="82" y="53" width="11" height="7" rx="1.5" fill="#94a3b8"/>
+                <rect x="95" y="53" width="13" height="7" rx="1.5" fill="#94a3b8"/>
+              </g>
+            </svg>`;
+
+        case 'mouse':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <radialGradient id="ms-shell" cx="36%" cy="26%" r="72%">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="50%" stop-color="#cbd5e1"/>
+                  <stop offset="100%" stop-color="#334155"/>
+                </radialGradient>
+                <linearGradient id="ms-wheel" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#0f172a"/>
+                  <stop offset="50%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+              </defs>
+              <!-- Kabel USB melengkung -->
+              <path d="M60 15 C60 6, 75 8, 82 3" fill="none" stroke="#334155" stroke-width="2.6" stroke-linecap="round"/>
+              <!-- Bayangan Meja -->
+              <ellipse cx="62" cy="49" rx="22" ry="31" fill="#0f172a" opacity="0.28"/>
+              <!-- Bodi Mouse Ergonomis -->
+              <rect x="39" y="14" width="42" height="63" rx="21" fill="url(#ms-shell)" stroke="#64748b" stroke-width="1.2"/>
+              <!-- Garis Pemisah Klik Kiri & Kanan -->
+              <line x1="60" y1="14" x2="60" y2="41" stroke="#64748b" stroke-width="1.3"/>
+              <path d="M39 41 Q60 44 81 41" fill="none" stroke="#64748b" stroke-width="1.2"/>
+              <!-- Scroll Wheel Bercahaya -->
+              <rect x="57" y="21" width="6" height="14" rx="3" fill="url(#ms-wheel)" stroke="#1e293b" stroke-width="0.8"/>
+              <!-- DPI Switch -->
+              <rect x="58.5" y="37" width="3" height="3" rx="1" fill="#0284c7"/>
+              <!-- LED Samping -->
+              <path d="M41 51 Q43 64 51 72" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+              <path d="M79 51 Q77 64 69 72" fill="none" stroke="#38bdf8" stroke-width="2" stroke-linecap="round"/>
+            </svg>`;
+
+        case 'microphone':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="mic-mesh" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#f8fafc"/>
+                  <stop offset="48%" stop-color="#94a3b8"/>
+                  <stop offset="100%" stop-color="#1e293b"/>
+                </linearGradient>
+                <linearGradient id="mic-body" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#0f172a"/>
+                  <stop offset="45%" stop-color="#475569"/>
+                  <stop offset="100%" stop-color="#090d16"/>
+                </linearGradient>
+              </defs>
+              <!-- Stand Meja -->
+              <ellipse cx="60" cy="76" rx="21" ry="4.5" fill="#1e293b"/>
+              <rect x="57.5" y="58" width="5" height="18" fill="#475569"/>
+              <!-- U-Mount Penyangga -->
+              <path d="M41 36 L41 46 C41 56, 79 56, 79 46 L79 36" fill="none" stroke="#334155" stroke-width="3.6" stroke-linecap="round"/>
+              <!-- Bodi Kapsul Mikrofon Studio -->
+              <rect x="47" y="9" width="26" height="43" rx="13" fill="url(#mic-body)" stroke="#64748b" stroke-width="1"/>
+              <!-- Kepala Jaring Kondensor -->
+              <path d="M47 23 C47 12, 73 12, 73 23 L73 29 L47 29 Z" fill="url(#mic-mesh)"/>
+              <!-- Cincin Krom Biru -->
+              <rect x="46.5" y="28" width="27" height="3.2" rx="1" fill="#38bdf8"/>
+              <!-- Tekstur Grille -->
+              <line x1="51" y1="17" x2="69" y2="17" stroke="#475569" stroke-width="1" stroke-dasharray="2 2"/>
+              <line x1="49" y1="21" x2="71" y2="21" stroke="#475569" stroke-width="1" stroke-dasharray="2 2"/>
+              <line x1="49" y1="25" x2="71" y2="25" stroke="#475569" stroke-width="1" stroke-dasharray="2 2"/>
+              <!-- Tombol Mute & Gain -->
+              <circle cx="60" cy="39" r="3" fill="#22c55e" stroke="#0f172a" stroke-width="0.8"/>
+              <circle cx="60" cy="46" r="2" fill="#94a3b8"/>
+            </svg>`;
+
+        case 'barcode_scanner':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="bs-body" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#334155"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+                <linearGradient id="bs-laser" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#ef4444" stop-opacity="0.9"/>
+                  <stop offset="100%" stop-color="#ef4444" stop-opacity="0"/>
+                </linearGradient>
+              </defs>
+              <!-- Sinar Laser Pemindai -->
+              <polygon points="72,21 114,9 114,45 72,34" fill="url(#bs-laser)"/>
+              <line x1="72" y1="28" x2="114" y2="28" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"/>
+              <!-- Gagang Scanner Ergonomis -->
+              <path d="M40 34 L32 72 C31 76, 35 78, 40 78 L49 78 C53 78, 55 75, 55 71 L58 38 Z" fill="url(#bs-body)" stroke="#475569" stroke-width="1"/>
+              <!-- Tombol Pelatuk (Trigger) Kuning -->
+              <path d="M56 41 L61 45 L58 53 L54 50 Z" fill="#f59e0b"/>
+              <!-- Kepala Pemindai -->
+              <path d="M32 20 C32 14, 38 12, 46 13 L74 18 C77 19, 78 22, 77 26 L73 37 C72 40, 68 41, 64 40 L36 35 C32 34, 31 28, 32 20 Z" fill="url(#bs-body)" stroke="#64748b" stroke-width="1.1"/>
+              <!-- Aksen Bumper Pelindung -->
+              <path d="M68 17 L75 18.5 L72 38 L65 37 Z" fill="#0284c7"/>
+              <!-- Lensa Kaca Merah -->
+              <polygon points="73,20 77,21 75,35 71,34" fill="#dc2626"/>
+              <!-- Label Barcode Target -->
+              <rect x="93" y="15" width="20" height="25" rx="2" fill="#ffffff" stroke="#cbd5e1" stroke-width="0.8"/>
+              <g fill="#0f172a">
+                <rect x="96" y="18" width="2" height="19"/>
+                <rect x="100" y="18" width="1" height="19"/>
+                <rect x="103" y="18" width="3" height="19"/>
+                <rect x="108" y="18" width="1.5" height="19"/>
+              </g>
+            </svg>`;
+
+        case 'ram':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="ram-pcb" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#065f46"/>
+                  <stop offset="100%" stop-color="#022c22"/>
+                </linearGradient>
+                <linearGradient id="ram-heatsink" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#1e293b"/>
+                  <stop offset="50%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#1e293b"/>
+                </linearGradient>
+              </defs>
+              <!-- Papan PCB Hijau Tua -->
+              <rect x="8" y="21" width="104" height="39" rx="3" fill="url(#ram-pcb)" stroke="#10b981" stroke-width="1"/>
+              <!-- Heatsink & Strip RGB -->
+              <rect x="8" y="18" width="104" height="7" rx="2" fill="url(#ram-heatsink)"/>
+              <!-- Takik Pengunci Samping -->
+              <circle cx="8" cy="39" r="2.5" fill="#f1f5f9"/>
+              <circle cx="112" cy="39" r="2.5" fill="#f1f5f9"/>
+              <!-- 8 Chip IC DRAM -->
+              <g fill="#0f172a" stroke="#64748b" stroke-width="0.7">
+                <rect x="14" y="29" width="9" height="18" rx="1"/>
+                <rect x="26" y="29" width="9" height="18" rx="1"/>
+                <rect x="38" y="29" width="9" height="18" rx="1"/>
+                <rect x="50" y="29" width="9" height="18" rx="1"/>
+                <rect x="62" y="29" width="9" height="18" rx="1"/>
+                <rect x="74" y="29" width="9" height="18" rx="1"/>
+                <rect x="86" y="29" width="9" height="18" rx="1"/>
+                <rect x="98" y="29" width="9" height="18" rx="1"/>
+              </g>
+              <!-- Pin Konektor Emas Bawah (dengan Notch DDR) -->
+              <rect x="12" y="56" width="49" height="6.5" rx="1" fill="#f59e0b"/>
+              <rect x="65" y="56" width="43" height="6.5" rx="1" fill="#f59e0b"/>
+              <g stroke="#b45309" stroke-width="1">
+                <line x1="15" y1="56" x2="15" y2="62.5"/>
+                <line x1="21" y1="56" x2="21" y2="62.5"/>
+                <line x1="27" y1="56" x2="27" y2="62.5"/>
+                <line x1="33" y1="56" x2="33" y2="62.5"/>
+                <line x1="39" y1="56" x2="39" y2="62.5"/>
+                <line x1="45" y1="56" x2="45" y2="62.5"/>
+                <line x1="51" y1="56" x2="51" y2="62.5"/>
+                <line x1="71" y1="56" x2="71" y2="62.5"/>
+                <line x1="77" y1="56" x2="77" y2="62.5"/>
+                <line x1="83" y1="56" x2="83" y2="62.5"/>
+                <line x1="89" y1="56" x2="89" y2="62.5"/>
+                <line x1="95" y1="56" x2="95" y2="62.5"/>
+                <line x1="101" y1="56" x2="101" y2="62.5"/>
+              </g>
+            </svg>`;
+
+        case 'rom':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="rom-chip" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#334155"/>
+                  <stop offset="100%" stop-color="#090d16"/>
+                </linearGradient>
+              </defs>
+              <!-- Soket Motherboard -->
+              <rect x="24" y="12" width="72" height="60" rx="6" fill="#1e3a8a" stroke="#60a5fa" stroke-width="1.3"/>
+              <!-- Jalur Sirkuit PCB -->
+              <path d="M24 22 L12 22 M24 42 L10 42 M24 62 L14 62 M96 22 L108 22 M96 42 L110 42 M96 62 L106 62" stroke="#93c5fd" stroke-width="1.6" stroke-linecap="round"/>
+              <!-- Kaki Pin Metalik Kiri & Kanan -->
+              <g fill="#e2e8f0">
+                <rect x="29" y="20" width="8" height="3.5" rx="1"/>
+                <rect x="29" y="28" width="8" height="3.5" rx="1"/>
+                <rect x="29" y="36" width="8" height="3.5" rx="1"/>
+                <rect x="29" y="44" width="8" height="3.5" rx="1"/>
+                <rect x="29" y="52" width="8" height="3.5" rx="1"/>
+                <rect x="29" y="60" width="8" height="3.5" rx="1"/>
+                <rect x="83" y="20" width="8" height="3.5" rx="1"/>
+                <rect x="83" y="28" width="8" height="3.5" rx="1"/>
+                <rect x="83" y="36" width="8" height="3.5" rx="1"/>
+                <rect x="83" y="44" width="8" height="3.5" rx="1"/>
+                <rect x="83" y="52" width="8" height="3.5" rx="1"/>
+                <rect x="83" y="60" width="8" height="3.5" rx="1"/>
+              </g>
+              <!-- IC Chip Hitam Tengah -->
+              <rect x="36" y="16" width="48" height="52" rx="4" fill="url(#rom-chip)" stroke="#94a3b8" stroke-width="1.1"/>
+              <!-- Takik Orientasi Chip -->
+              <path d="M55 16 A5 5 0 0 0 65 16" fill="#020617"/>
+              <!-- Label Stiker Firmware Hologram -->
+              <rect x="42" y="27" width="36" height="28" rx="3" fill="#f8fafc" stroke="#cbd5e1" stroke-width="0.9"/>
+              <rect x="45" y="31" width="30" height="5.5" rx="1" fill="#0284c7"/>
+              <line x1="46" y1="41" x2="74" y2="41" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+              <line x1="46" y1="46" x2="68" y2="46" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="71" cy="50" r="2.4" fill="#f59e0b"/>
+            </svg>`;
+
+        case 'ssd':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="ssd-case" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#334155"/>
+                  <stop offset="50%" stop-color="#1e293b"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+                <linearGradient id="ssd-accent" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stop-color="#0ea5e9"/>
+                  <stop offset="100%" stop-color="#6366f1"/>
+                </linearGradient>
+              </defs>
+              <!-- Casing Aluminium 2.5" -->
+              <rect x="20" y="10" width="80" height="62" rx="7" fill="url(#ssd-case)" stroke="#64748b" stroke-width="1.3"/>
+              <!-- Garis Desain Futuristik -->
+              <polygon points="20,44 64,10 82,10 20,58" fill="url(#ssd-accent)" opacity="0.9"/>
+              <polygon points="20,62 88,10 100,10 100,18 32,72 20,72" fill="#38bdf8" opacity="0.28"/>
+              <!-- 4 Baut Sudut -->
+              <circle cx="26" cy="16" r="2" fill="#94a3b8"/>
+              <circle cx="94" cy="16" r="2" fill="#94a3b8"/>
+              <circle cx="26" cy="66" r="2" fill="#94a3b8"/>
+              <circle cx="94" cy="66" r="2" fill="#94a3b8"/>
+              <!-- Ikon Flash / Speed Chip -->
+              <rect x="64" y="42" width="26" height="18" rx="3" fill="#0f172a" stroke="#38bdf8" stroke-width="1.1"/>
+              <path d="M78 45 L73 51 L77 51 L75 57 L82 50 L78 50 Z" fill="#38bdf8"/>
+              <!-- Konektor SATA Data & Power Bawah -->
+              <rect x="30" y="72" width="24" height="4.5" rx="1" fill="#f59e0b"/>
+              <rect x="58" y="72" width="16" height="4.5" rx="1" fill="#f59e0b"/>
+            </svg>`;
+
+        case 'hard_disk':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="hdd-chassis" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#f1f5f9"/>
+                  <stop offset="100%" stop-color="#94a3b8"/>
+                </linearGradient>
+                <radialGradient id="hdd-platter" cx="40%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="45%" stop-color="#bae6fd"/>
+                  <stop offset="80%" stop-color="#64748b"/>
+                  <stop offset="100%" stop-color="#cbd5e1"/>
+                </radialGradient>
+              </defs>
+              <!-- Rangka Logam HDD 3.5" -->
+              <rect x="24" y="6" width="72" height="72" rx="6" fill="url(#hdd-chassis)" stroke="#475569" stroke-width="1.3"/>
+              <rect x="29" y="11" width="62" height="62" rx="4" fill="#1e293b"/>
+              <!-- Piringan Magnetik (Platter) -->
+              <circle cx="60" cy="37" r="22" fill="url(#hdd-platter)" stroke="#e2e8f0" stroke-width="1.1"/>
+              <circle cx="60" cy="37" r="7" fill="#334155" stroke="#94a3b8" stroke-width="1.5"/>
+              <circle cx="60" cy="37" r="2.5" fill="#cbd5e1"/>
+              <!-- Lengan Pembaca (Actuator Arm) -->
+              <circle cx="39" cy="61" r="6" fill="#64748b" stroke="#cbd5e1" stroke-width="1"/>
+              <polygon points="39,58 58,41 60,43 42,63" fill="#f8fafc" stroke="#475569" stroke-width="0.7"/>
+              <!-- Baut Sudut -->
+              <circle cx="27" cy="9" r="1.4" fill="#334155"/>
+              <circle cx="93" cy="9" r="1.4" fill="#334155"/>
+              <circle cx="27" cy="75" r="1.4" fill="#334155"/>
+              <circle cx="93" cy="75" r="1.4" fill="#334155"/>
+            </svg>`;
+
+        case 'speaker':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="spk-box" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#334155"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+                <radialGradient id="spk-cone" cx="40%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#475569"/>
+                  <stop offset="70%" stop-color="#1e293b"/>
+                  <stop offset="100%" stop-color="#020617"/>
+                </radialGradient>
+              </defs>
+              <!-- Speaker Kiri -->
+              <rect x="16" y="12" width="38" height="62" rx="6" fill="url(#spk-box)" stroke="#64748b" stroke-width="1.2"/>
+              <circle cx="35" cy="25" r="6" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+              <circle cx="35" cy="25" r="2.5" fill="#64748b"/>
+              <circle cx="35" cy="50" r="13" fill="url(#spk-cone)" stroke="#94a3b8" stroke-width="1.5"/>
+              <circle cx="35" cy="50" r="5" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+              <circle cx="35" cy="68" r="1.8" fill="#22c55e"/>
+
+              <!-- Speaker Kanan -->
+              <rect x="66" y="12" width="38" height="62" rx="6" fill="url(#spk-box)" stroke="#64748b" stroke-width="1.2"/>
+              <circle cx="85" cy="25" r="6" fill="#0f172a" stroke="#38bdf8" stroke-width="1.2"/>
+              <circle cx="85" cy="25" r="2.5" fill="#64748b"/>
+              <circle cx="85" cy="50" r="13" fill="url(#spk-cone)" stroke="#94a3b8" stroke-width="1.5"/>
+              <circle cx="85" cy="50" r="5" fill="#0f172a" stroke="#38bdf8" stroke-width="1"/>
+              <circle cx="85" cy="68" r="1.8" fill="#22c55e"/>
+            </svg>`;
+
+        case 'lcd_monitor':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="mon-screen" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#0284c7"/>
+                  <stop offset="55%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#818cf8"/>
+                </linearGradient>
+                <linearGradient id="mon-stand" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#94a3b8"/>
+                  <stop offset="100%" stop-color="#475569"/>
+                </linearGradient>
+              </defs>
+              <!-- Leher & Kaki Penyangga -->
+              <rect x="53" y="56" width="14" height="14" fill="url(#mon-stand)"/>
+              <ellipse cx="60" cy="72" rx="22" ry="4" fill="#64748b" stroke="#334155" stroke-width="0.9"/>
+              <!-- Bingkai Bezel Tipis -->
+              <rect x="14" y="8" width="92" height="52" rx="5" fill="#0f172a" stroke="#475569" stroke-width="1.3"/>
+              <!-- Panel Layar LCD -->
+              <rect x="18" y="12" width="84" height="42" rx="2" fill="url(#mon-screen)"/>
+              <!-- Konten Jendela Desktop di Layar -->
+              <rect x="24" y="17" width="44" height="26" rx="2.5" fill="#ffffff" opacity="0.94"/>
+              <rect x="24" y="17" width="44" height="5" rx="1" fill="#1e293b"/>
+              <rect x="28" y="25" width="16" height="14" rx="1.5" fill="#bae6fd"/>
+              <line x1="48" y1="27" x2="64" y2="27" stroke="#64748b" stroke-width="2" stroke-linecap="round"/>
+              <line x1="48" y1="32" x2="61" y2="32" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+              <line x1="48" y1="37" x2="58" y2="37" stroke="#94a3b8" stroke-width="2" stroke-linecap="round"/>
+              <!-- Taskbar Bawah -->
+              <rect x="18" y="50" width="84" height="4" fill="#0f172a" opacity="0.65"/>
+              <!-- Kilau Kaca Layar -->
+              <polygon points="18,12 52,12 34,54 18,54" fill="#ffffff" opacity="0.18"/>
+              <!-- LED Power -->
+              <circle cx="96" cy="57" r="1.4" fill="#22c55e"/>
+            </svg>`;
+
+        case 'printer':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="prn-body" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="100%" stop-color="#cbd5e1"/>
+                </linearGradient>
+              </defs>
+              <!-- Baki Kertas Masuk Atas -->
+              <polygon points="36,10 84,10 88,28 32,28" fill="#e2e8f0" stroke="#64748b" stroke-width="1"/>
+              <rect x="40" y="13" width="40" height="15" fill="#ffffff"/>
+              <!-- Bodi Utama Printer -->
+              <rect x="18" y="26" width="84" height="34" rx="7" fill="url(#prn-body)" stroke="#64748b" stroke-width="1.2"/>
+              <rect x="24" y="34" width="72" height="10" rx="3" fill="#1e293b"/>
+              <!-- Panel Tombol & Layar Mini -->
+              <rect x="74" y="36" width="14" height="6" rx="1.5" fill="#38bdf8"/>
+              <circle cx="93" cy="39" r="2" fill="#22c55e"/>
+              <!-- Slot Keluar Kertas -->
+              <rect x="32" y="50" width="56" height="5" rx="1.5" fill="#0f172a"/>
+              <!-- Kertas Hasil Cetak -->
+              <polygon points="37,52 83,52 87,76 33,76" fill="#ffffff" stroke="#94a3b8" stroke-width="1"/>
+              <line x1="42" y1="58" x2="78" y2="58" stroke="#0284c7" stroke-width="2.2" stroke-linecap="round"/>
+              <line x1="42" y1="63" x2="72" y2="63" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+              <line x1="42" y1="68" x2="76" y2="68" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>`;
+
+        case 'lcd_proyektor':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="prj-body" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#ffffff"/>
+                  <stop offset="100%" stop-color="#cbd5e1"/>
+                </linearGradient>
+                <radialGradient id="prj-lens" cx="38%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#bae6fd"/>
+                  <stop offset="45%" stop-color="#0284c7"/>
+                  <stop offset="85%" stop-color="#1e1b4b"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </radialGradient>
+              </defs>
+              <!-- Kaki Karet Bawah -->
+              <rect x="24" y="60" width="12" height="5" rx="2" fill="#334155"/>
+              <rect x="84" y="60" width="12" height="5" rx="2" fill="#334155"/>
+              <!-- Bodi Utama Proyektor -->
+              <rect x="14" y="24" width="92" height="37" rx="8" fill="url(#prj-body)" stroke="#64748b" stroke-width="1.2"/>
+              <!-- Kisi-kisi Ventilasi Panas -->
+              <g stroke="#64748b" stroke-width="1.8" stroke-linecap="round">
+                <line x1="22" y1="33" x2="22" y2="52"/>
+                <line x1="27" y1="33" x2="27" y2="52"/>
+                <line x1="32" y1="33" x2="32" y2="52"/>
+                <line x1="37" y1="33" x2="37" y2="52"/>
+              </g>
+              <!-- Panel Kontrol Atas -->
+              <rect x="48" y="24" width="22" height="4" rx="1.5" fill="#334155"/>
+              <circle cx="53" cy="26" r="1.2" fill="#22c55e"/>
+              <!-- Lensa Optik Besar -->
+              <circle cx="82" cy="42" r="16" fill="#1e293b" stroke="#94a3b8" stroke-width="2"/>
+              <circle cx="82" cy="42" r="11.5" fill="url(#prj-lens)"/>
+              <!-- Refleksi Cahaya Lensa -->
+              <ellipse cx="78" cy="38" rx="3.5" ry="2" transform="rotate(-25 78 38)" fill="#ffffff" opacity="0.8"/>
+            </svg>`;
+
+        case 'ms_word':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="wd-badge" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#2563eb"/>
+                  <stop offset="100%" stop-color="#1e3a8a"/>
+                </linearGradient>
+              </defs>
+              <!-- Lembar Dokumen Kanan -->
+              <rect x="42" y="10" width="54" height="64" rx="6" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.2"/>
+              <rect x="42" y="10" width="54" height="16" rx="6" fill="#60a5fa"/>
+              <rect x="42" y="26" width="54" height="16" fill="#3b82f6"/>
+              <rect x="42" y="42" width="54" height="16" fill="#2563eb"/>
+              <!-- Garis Paragraf Dokumen -->
+              <line x1="62" y1="20" x2="88" y2="20" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="62" y1="34" x2="88" y2="34" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="62" y1="50" x2="88" y2="50" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+              <line x1="62" y1="64" x2="84" y2="64" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round"/>
+              <!-- Kotak Ikon Huruf W -->
+              <rect x="22" y="22" width="38" height="40" rx="7" fill="url(#wd-badge)" stroke="#93c5fd" stroke-width="1.2"/>
+              <text x="41" y="50" text-anchor="middle" fill="#ffffff" font-family="Plus Jakarta Sans, sans-serif" font-weight="800" font-size="24">W</text>
+            </svg>`;
+
+        case 'windows':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="win-1" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#38bdf8"/>
+                  <stop offset="100%" stop-color="#0284c7"/>
+                </linearGradient>
+                <linearGradient id="win-2" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#60a5fa"/>
+                  <stop offset="100%" stop-color="#2563eb"/>
+                </linearGradient>
+              </defs>
+              <!-- Kartu Latar Belakang -->
+              <rect x="24" y="10" width="72" height="64" rx="14" fill="#0f172a" stroke="#38bdf8" stroke-width="1.3"/>
+              <!-- 4 Panel Jendela Sistem Operasi -->
+              <rect x="35" y="20" width="23" height="20" rx="2.5" fill="url(#win-1)"/>
+              <rect x="62" y="20" width="23" height="20" rx="2.5" fill="url(#win-2)"/>
+              <rect x="35" y="44" width="23" height="20" rx="2.5" fill="url(#win-2)"/>
+              <rect x="62" y="44" width="23" height="20" rx="2.5" fill="#1d4ed8"/>
+            </svg>`;
+
+        case 'google_chrome':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <radialGradient id="chr-core" cx="35%" cy="35%" r="65%">
+                  <stop offset="0%" stop-color="#60a5fa"/>
+                  <stop offset="100%" stop-color="#1d4ed8"/>
+                </radialGradient>
+              </defs>
+              <circle cx="60" cy="42" r="31" fill="#ffffff"/>
+              <!-- Sektor Merah Atas -->
+              <path d="M60 11 A31 31 0 0 1 88 28 L60 28 L46 50 L33 27 A31 31 0 0 1 60 11 Z" fill="#ef4444"/>
+              <!-- Sektor Kuning Kanan -->
+              <path d="M88 28 A31 31 0 0 1 60 73 L73 50 L60 28 Z" fill="#facc15"/>
+              <!-- Sektor Hijau Kiri -->
+              <path d="M33 27 L46 50 L60 73 A31 31 0 0 1 33 27 Z" fill="#22c55e"/>
+              <!-- Cincin Putih & Inti Biru -->
+              <circle cx="60" cy="42" r="14" fill="#ffffff"/>
+              <circle cx="60" cy="42" r="11" fill="url(#chr-core)"/>
+            </svg>`;
+
+        case 'samadav':
+          return `
+            <svg viewBox="0 0 120 84" class="w-full h-full drop-shadow-md">
+              <defs>
+                <linearGradient id="smd-shield" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#22c55e"/>
+                  <stop offset="55%" stop-color="#16a34a"/>
+                  <stop offset="100%" stop-color="#14532d"/>
+                </linearGradient>
+              </defs>
+              <!-- Perisai Antivirus Hijau -->
+              <path d="M60 9 L90 20 L90 42 C90 60, 76 71, 60 77 C44 71, 30 60, 30 42 L30 20 Z" fill="url(#smd-shield)" stroke="#86efac" stroke-width="1.6"/>
+              <!-- Lapisan Dalam Perisai -->
+              <path d="M60 15 L84 24 L84 42 C84 56, 72 65, 60 70 C48 65, 36 56, 36 42 L36 24 Z" fill="none" stroke="#bbf7d0" stroke-width="1" opacity="0.75"/>
+              <!-- Tanda Centang Proteksi -->
+              <path d="M47 43 L56 52 L75 32" fill="none" stroke="#ffffff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>`;
+
+        default:
+          return '';
+      }
+    }
+
+    /**
+     * 3. ENGINE AUDIO SINTETIS & MUSIK LATAR (TONE.JS)
+     */
+    let soundEnabled = true;
+    let musicEnabled = true;
+    let bgmInterval = null;
+    let bgmSynth = null;
+    let bgmBass = null;
+    let bgmPad = null;
+    let sfxSynth = null;
+    let bgmInitialized = false;
+    let bgmStep = 0;
+    let currentBpm = 116;
+
+    const BGM_MELODY = [
+      'C5', 'E5', 'G5', 'A5', 'G5', 'E5', 'D5', 'E5',
+      'A4', 'C5', 'E5', 'G5', 'E5', 'C5', 'B4', 'C5',
+      'F4', 'A4', 'C5', 'E5', 'D5', 'C5', 'A4', 'C5',
+      'G4', 'B4', 'D5', 'G5', 'F5', 'D5', 'B4', 'D5'
+    ];
+    const BGM_BASSLINE = [
+      'C3', null, 'G2', null, 'C3', null, 'E3', null,
+      'A2', null, 'E2', null, 'A2', null, 'C3', null,
+      'F2', null, 'C3', null, 'F2', null, 'A2', null,
+      'G2', null, 'D3', null, 'G2', null, 'B2', null
+    ];
+    const BGM_CHORDS = {
+      0: ['C4', 'E4', 'G4'],
+      8: ['A3', 'C4', 'E4'],
+      16: ['F3', 'A3', 'C4'],
+      24: ['G3', 'B3', 'D4']
+    };
+
+    function playBgmStep() {
+      if (!musicEnabled || !bgmInitialized || typeof Tone === 'undefined') return;
+      if (Tone.context.state !== 'running') return;
+
+      const now = Tone.now() + 0.02;
+      const idx = bgmStep % BGM_MELODY.length;
+      const note = BGM_MELODY[idx];
+      const bass = BGM_BASSLINE[idx];
+
+      if (note) bgmSynth.triggerAttackRelease(note, '16n', now);
+      if (bass) bgmBass.triggerAttackRelease(bass, '8n', now);
+      if (BGM_CHORDS[idx]) bgmPad.triggerAttackRelease(BGM_CHORDS[idx], '2n', now);
+
+      bgmStep++;
+    }
+
+    function startBgmScheduler() {
+      stopBgmScheduler();
+      if (!musicEnabled) return;
+      const eighthNoteMs = Math.round((60 / currentBpm / 2) * 1000);
+      playBgmStep();
+      bgmInterval = setInterval(playBgmStep, eighthNoteMs);
+    }
+
+    function stopBgmScheduler() {
+      if (bgmInterval) {
+        clearInterval(bgmInterval);
+        bgmInterval = null;
+      }
+    }
+
+    async function initAndStartMusic() {
+      if (!musicEnabled || typeof Tone === 'undefined') return;
+      try {
+        if (Tone.context.state !== 'running') {
+          await Tone.start();
+        }
+        if (!bgmInitialized) {
+          bgmSynth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.02, decay: 0.16, sustain: 0.14, release: 0.35 }
+          }).toDestination();
+          bgmSynth.volume.value = -16;
+
+          bgmBass = new Tone.Synth({
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.02, decay: 0.22, sustain: 0.1, release: 0.3 }
+          }).toDestination();
+          bgmBass.volume.value = -14;
+
+          bgmPad = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.08, decay: 0.25, sustain: 0.2, release: 0.45 }
+          }).toDestination();
+          bgmPad.volume.value = -23;
+
+          bgmInitialized = true;
+        }
+        if (!bgmInterval) {
+          startBgmScheduler();
+        }
+      } catch (e) {
+        // Abaikan jika browser belum mengizinkan audio
+      }
+    }
+
+    function updateMusicTempo() {
+      const targetBpm = gameState.timeLeft <= 30 ? 136 : 116;
+      if (targetBpm !== currentBpm) {
+        currentBpm = targetBpm;
+        if (musicEnabled && bgmInitialized && bgmInterval) {
+          startBgmScheduler();
+        }
+      }
+    }
+
+    async function playSound(type) {
+      if (!soundEnabled || typeof Tone === 'undefined') return;
+      try {
+        if (Tone.context.state !== 'running') {
+          await Tone.start();
+        }
+        if (!sfxSynth) {
+          sfxSynth = new Tone.Synth({
+            oscillator: { type: 'triangle' },
+            envelope: { attack: 0.01, decay: 0.15, sustain: 0.05, release: 0.25 }
+          }).toDestination();
+          sfxSynth.volume.value = -10;
+        }
+
+        sfxSynth.oscillator.type = type === 'wrong' ? 'sawtooth' : 'triangle';
+        const now = Tone.now() + 0.01;
+
+        if (type === 'correct') {
+          sfxSynth.triggerAttackRelease('C5', '16n', now);
+          sfxSynth.triggerAttackRelease('E5', '16n', now + 0.08);
+          sfxSynth.triggerAttackRelease('G5', '8n', now + 0.16);
+        } else if (type === 'wrong') {
+          sfxSynth.triggerAttackRelease('E3', '16n', now);
+          sfxSynth.triggerAttackRelease('C3', '8n', now + 0.11);
+        } else if (type === 'hint') {
+          sfxSynth.triggerAttackRelease('A4', '16n', now);
+          sfxSynth.triggerAttackRelease('D5', '16n', now + 0.07);
+          sfxSynth.triggerAttackRelease('F#5', '8n', now + 0.14);
+        } else if (type === 'stageUp') {
+          sfxSynth.triggerAttackRelease('C5', '16n', now);
+          sfxSynth.triggerAttackRelease('E5', '16n', now + 0.09);
+          sfxSynth.triggerAttackRelease('G5', '16n', now + 0.18);
+          sfxSynth.triggerAttackRelease('C6', '4n', now + 0.27);
+        } else if (type === 'win') {
+          ['C5', 'E5', 'G5', 'B5', 'C6'].forEach((note, i) => {
+            sfxSynth.triggerAttackRelease(note, '16n', now + i * 0.09);
+          });
+        }
+      } catch (e) {
+        // Abaikan error audio
+      }
+    }
+
+    /**
+     * 4. STATE PERMAINAN & UTILITAS ACAK
+     */
+    const gameState = {
+      playerName: '',
+      stage: 1,
+      lives: 3,
+      score: 0,
+      timeLeft: 180, // 3 menit = 180 detik
+      timerInterval: null,
+      usedHint5050: false,
+      usedHintTime: false,
+      activeHint: null, // { cardId, allowedZoneIds: [] }
+      selectedCardId: null, // Untuk interaksi tap-to-select & tap-to-drop
+      remainingCards: [],
+      matchedCount: 0,
+      totalInStage: 0,
+      stageTargets: [] // Untuk Stage 1 & 2
+    };
+
+    function shuffleArray(arr) {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    }
+
+    /**
+     * 5. APREASI JAWABAN BENAR & SALAH
+     */
+    const PRAISE_MESSAGES = [
+      'Luar Biasa! 🎉',
+      'Tepat Sekali! 🌟',
+      'Hebat Banget! ⚡',
+      'Jenius Teknologi! 🚀',
+      'Sempurna! 👏'
+    ];
+
+    const ENCOURAGE_MESSAGES = [
+      'Hampir Tepat! 💪',
+      'Tetap Semangat! 💡',
+      'Coba Lagi Yuk! 🔍',
+      'Jangan Menyerah! ✨'
+    ];
+
+    function setFeedback(type, title, desc) {
+      const banner = document.getElementById('feedback-banner');
+      const iconEl = document.getElementById('feedback-icon');
+      const titleEl = document.getElementById('feedback-title');
+      const descEl = document.getElementById('feedback-desc');
+
+      titleEl.textContent = title;
+      descEl.textContent = desc;
+
+      if (type === 'correct') {
+        banner.className = 'rounded-2xl px-4 py-2.5 bg-emerald-50/95 backdrop-blur-md border-2 border-emerald-400 shadow-md flex items-center justify-between gap-3 transition-all';
+        iconEl.textContent = '🌟';
+        titleEl.className = 'text-xs sm:text-sm font-extrabold text-emerald-800';
+        descEl.className = 'text-xs text-emerald-700 font-medium';
+      } else if (type === 'wrong') {
+        banner.className = 'rounded-2xl px-4 py-2.5 bg-rose-50/95 backdrop-blur-md border-2 border-rose-400 shadow-md flex items-center justify-between gap-3 transition-all';
+        iconEl.textContent = '💥';
+        titleEl.className = 'text-xs sm:text-sm font-extrabold text-rose-800';
+        descEl.className = 'text-xs text-rose-700 font-medium';
+      } else if (type === 'hint') {
+        banner.className = 'rounded-2xl px-4 py-2.5 bg-amber-50/95 backdrop-blur-md border-2 border-amber-400 shadow-md flex items-center justify-between gap-3 transition-all';
+        iconEl.textContent = '💡';
+        titleEl.className = 'text-xs sm:text-sm font-extrabold text-amber-900';
+        descEl.className = 'text-xs text-amber-800 font-medium';
+      } else {
+        banner.className = 'rounded-2xl px-4 py-2.5 bg-white/90 backdrop-blur-md border border-slate-200 shadow-sm flex items-center justify-between gap-3 transition-all';
+        iconEl.textContent = '🎯';
+        titleEl.className = 'text-xs sm:text-sm font-extrabold text-slate-800';
+        descEl.className = 'text-xs text-slate-600';
+      }
+    }
+
+    /**
+     * 6. RENDER HUD (NYAWA, WAKTU, SKOR, STAGE)
+     */
+    function renderLives() {
+      const el = document.getElementById('hud-lives');
+      el.textContent = '❤️'.repeat(Math.max(0, gameState.lives));
+    }
+
+    function updateScore(delta) {
+      gameState.score = Math.max(0, gameState.score + delta);
+      document.getElementById('hud-score').textContent = gameState.score;
+    }
+
+    function formatTime(sec) {
+      const m = Math.floor(sec / 60).toString().padStart(2, '0');
+      const s = (sec % 60).toString().padStart(2, '0');
+      return `${m}:${s}`;
+    }
+
+    function renderTimer() {
+      const display = document.getElementById('hud-timer');
+      const box = document.getElementById('timer-box');
+      display.textContent = formatTime(gameState.timeLeft);
+
+      if (gameState.timeLeft <= 30) {
+        box.className = 'bg-rose-100 border border-rose-300 px-3 py-1.5 rounded-xl text-center animate-pulse';
+        display.className = 'text-xs sm:text-sm font-extrabold text-rose-700 font-mono-tech mt-0.5 block';
+      } else {
+        box.className = 'bg-sky-50 border border-sky-200 px-3 py-1.5 rounded-xl text-center transition-colors';
+        display.className = 'text-xs sm:text-sm font-extrabold text-sky-700 font-mono-tech mt-0.5 block';
+      }
+      updateMusicTempo();
+    }
+
+    function startTimer() {
+      clearInterval(gameState.timerInterval);
+      renderTimer();
+      gameState.timerInterval = setInterval(() => {
+        gameState.timeLeft--;
+        renderTimer();
+        if (gameState.timeLeft <= 0) {
+          clearInterval(gameState.timerInterval);
+          endGame(false, 'Waktu 3 menit telah habis! Jangan menyerah, coba lagi untuk menaklukkan semua stage.');
+        }
+      }, 1000);
+    }
+
+    /**
+     * 7. PEMUATAN STAGE 1 - 4
+     */
+    function loadStage(stageNum) {
+      gameState.stage = stageNum;
+      gameState.activeHint = null;
+      gameState.selectedCardId = null;
+      gameState.matchedCount = 0;
+
+      const badge = document.getElementById('hud-stage-badge');
+      const title = document.getElementById('hud-stage-title');
+      const noNameBadge = document.getElementById('no-name-badge');
+      badge.textContent = `Stage ${stageNum} / 4`;
+
+      if (stageNum === 1) {
+        title.textContent = 'Tebak Nama Perangkat Komputer';
+        noNameBadge.classList.add('hidden');
+        gameState.remainingCards = shuffleArray(STAGE12_IDS);
+        gameState.stageTargets = shuffleArray(STAGE12_IDS);
+      } else if (stageNum === 2) {
+        title.textContent = 'Menjodohkan Fungsi Perangkat Komputer';
+        noNameBadge.classList.add('hidden');
+        gameState.remainingCards = shuffleArray(STAGE12_IDS);
+        gameState.stageTargets = shuffleArray(STAGE12_IDS);
+      } else if (stageNum === 3) {
+        title.textContent = 'Klasifikasi Software vs Hardware (Tanpa Nama)';
+        noNameBadge.classList.remove('hidden');
+        gameState.remainingCards = shuffleArray(STAGE3_IDS);
+        gameState.stageTargets = ['software', 'hardware'];
+      } else if (stageNum === 4) {
+        title.textContent = 'Klasifikasi Input, Proses & Output (Tanpa Nama)';
+        noNameBadge.classList.remove('hidden');
+        gameState.remainingCards = shuffleArray(STAGE4_IDS);
+        gameState.stageTargets = ['input', 'proses', 'output'];
+      }
+
+      gameState.totalInStage = gameState.remainingCards.length;
+      updateStageProgress();
+      renderDeck();
+      renderDropZones();
+    }
+
+    function updateStageProgress() {
+      document.getElementById('stage-progress-text').textContent = `${gameState.matchedCount} / ${gameState.totalInStage}`;
+      document.getElementById('deck-remaining-count').textContent = gameState.remainingCards.length;
+    }
+
+    /**
+     * 8. RENDER DEK KARTU PERANGKAT
+     */
+    function renderDeck() {
+      const deckEl = document.getElementById('card-deck');
+      deckEl.innerHTML = '';
+
+      // Sesuaikan jumlah kolom grid agar rapi
+      if (gameState.stage === 3) {
+        deckEl.className = 'grid grid-cols-4 sm:grid-cols-8 gap-2.5 min-h-[104px]';
+      } else {
+        deckEl.className = 'grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2 sm:gap-2.5 min-h-[104px]';
+      }
+
+      // Pada Stage 1 (tebak nama), Stage 3 & 4 (aturan eksplisit tanpa nama), kartu hanya menampilkan ilustrasi gambar!
+      // Pada Stage 2 (menjodohkan fungsi), kartu menampilkan ilustrasi + nama perangkat.
+      const showLabelOnCard = (gameState.stage === 2);
+
+      gameState.remainingCards.forEach((cardId) => {
+        const device = DEVICES[cardId];
+        const isHintCard = gameState.activeHint && gameState.activeHint.cardId === cardId;
+        const isSelected = gameState.selectedCardId === cardId;
+
+        const card = document.createElement('div');
+        card.dataset.cardId = cardId;
+        card.draggable = true;
+        card.className = [
+          'tech-card-surface rounded-2xl border-2 p-2 flex flex-col items-center justify-center shadow-sm',
+          isHintCard
+            ? 'hint-target-card'
+            : isSelected
+              ? 'border-sky-500 ring-4 ring-sky-400/30 scale-[1.03]'
+              : 'border-slate-200/90 hover:border-sky-400'
+        ].join(' ');
+
+        card.innerHTML = `
+          <div class="w-full flex items-center justify-between px-0.5 mb-0.5 pointer-events-none">
+            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+            <span class="text-[7px] font-mono-tech font-bold uppercase tracking-widest text-slate-400">HW/SW</span>
+            <span class="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+          </div>
+          ${isHintCard ? '<span class="absolute -top-2 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-amber-500 text-white text-[8px] font-extrabold uppercase tracking-wider shadow whitespace-nowrap z-10">⭐ Bantuan</span>' : ''}
+          <div class="w-16 h-12 sm:w-20 sm:h-14 flex items-center justify-center pointer-events-none">
+            ${getDeviceSVG(cardId)}
+          </div>
+          ${showLabelOnCard ? `
+            <span class="mt-1 px-1.5 py-0.5 rounded-md bg-slate-800 text-white text-[9px] sm:text-[10px] font-bold text-center leading-tight truncate max-w-full pointer-events-none">
+              ${device.name}
+            </span>
+          ` : ''}
+        `;
+
+        // Desktop Drag Events
+        card.addEventListener('dragstart', (e) => {
+          e.dataTransfer.setData('text/plain', cardId);
+          e.dataTransfer.effectAllowed = 'move';
+          card.classList.add('card-dragging');
+          gameState.selectedCardId = cardId;
+        });
+
+        card.addEventListener('dragend', () => {
+          card.classList.remove('card-dragging');
+        });
+
+        // Klik / Tap untuk memilih kartu (aksesibilitas cepat)
+        card.addEventListener('click', () => {
+          gameState.selectedCardId = (gameState.selectedCardId === cardId) ? null : cardId;
+          renderDeck();
+        });
+
+        // Touch Drag & Drop (Mobile/Tablet)
+        setupTouchDrag(card, cardId);
+
+        deckEl.appendChild(card);
+      });
+    }
+
+    /**
+     * 9. RENDER AREA DROP SESUAI STAGE
+     */
+    function renderDropZones() {
+      const container = document.getElementById('drop-zones-container');
+      container.innerHTML = '';
+
+      if (gameState.stage === 1 || gameState.stage === 2) {
+        // 12 Zona Drop Individual (Stage 1: Nama Perangkat, Stage 2: Fungsi Perangkat)
+        container.className = gameState.stage === 1
+          ? 'flex-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5'
+          : 'flex-1 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5';
+
+        gameState.stageTargets.forEach((targetId) => {
+          const device = DEVICES[targetId];
+          const isMatched = !gameState.remainingCards.includes(targetId);
+
+          // Cek status Bantuan 50:50
+          let hintClass = '';
+          if (gameState.activeHint && !isMatched) {
+            if (gameState.activeHint.allowedZoneIds.includes(targetId)) {
+              hintClass = 'hint-zone-active';
+            } else {
+              hintClass = 'hint-zone-dimmed';
+            }
+          }
+
+          const zone = document.createElement('div');
+          zone.dataset.zoneId = targetId;
+          zone.className = [
+            'drop-zone rounded-2xl border-2 p-2.5 flex flex-col items-center justify-center text-center relative min-h-[105px]',
+            isMatched
+              ? 'bg-emerald-50/90 border-emerald-400 shadow-sm'
+              : 'bg-slate-50/90 border-dashed border-slate-300 hover:border-sky-400 cursor-pointer',
+            hintClass
+          ].join(' ');
+
+          if (isMatched) {
+            zone.innerHTML = `
+              <div class="animate-correct-pop flex flex-col items-center">
+                <span class="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold mb-1">✓ BENAR</span>
+                <div class="w-16 h-12 flex items-center justify-center">${getDeviceSVG(targetId)}</div>
+                <p class="mt-1 text-xs font-extrabold text-emerald-900">${device.name}</p>
+              </div>
+            `;
+          } else {
+            zone.innerHTML = gameState.stage === 1
+              ? `
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Taruh Gambar</span>
+                <p class="text-xs sm:text-sm font-extrabold text-slate-800 leading-snug">${device.name}</p>
+              `
+              : `
+                <span class="text-[9px] font-extrabold uppercase tracking-wider text-indigo-500 mb-1">Fungsi Perangkat</span>
+                <p class="text-[11px] sm:text-xs font-semibold text-slate-700 leading-snug">${device.func}</p>
+              `;
+
+            bindDropZoneEvents(zone, targetId);
+          }
+
+          container.appendChild(zone);
+        });
+
+      } else if (gameState.stage === 3) {
+        // Stage 3: 2 Kolom Besar (Software vs Hardware)
+        container.className = 'flex-1 grid grid-cols-1 md:grid-cols-2 gap-3.5';
+
+        const categories = [
+          {
+            id: 'software',
+            title: 'SOFTWARE (Perangkat Lunak)',
+            subtitle: 'Program, sistem operasi & aplikasi digital',
+            badge: '💻 SOFTWARE',
+            accent: 'indigo',
+            matchedIds: STAGE3_IDS.filter(id => DEVICES[id].type === 'software' && !gameState.remainingCards.includes(id))
+          },
+          {
+            id: 'hardware',
+            title: 'HARDWARE (Perangkat Keras)',
+            subtitle: 'Komponen fisik komputer yang dapat disentuh',
+            badge: '🖥️ HARDWARE',
+            accent: 'sky',
+            matchedIds: STAGE3_IDS.filter(id => DEVICES[id].type === 'hardware' && !gameState.remainingCards.includes(id))
+          }
+        ];
+
+        categories.forEach((cat) => {
+          let hintClass = '';
+          if (gameState.activeHint) {
+            hintClass = gameState.activeHint.allowedZoneIds.includes(cat.id)
+              ? 'hint-zone-active'
+              : 'hint-zone-dimmed';
+          }
+
+          const zone = document.createElement('div');
+          zone.dataset.zoneId = cat.id;
+          zone.className = [
+            'drop-zone rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/90 p-3.5 flex flex-col justify-between min-h-[210px] cursor-pointer',
+            hintClass
+          ].join(' ');
+
+          const slotsHTML = Array.from({ length: 4 }, (_, idx) => {
+            const mId = cat.matchedIds[idx];
+            if (mId) {
+              return `
+                <div class="animate-correct-pop rounded-xl bg-emerald-50 border-2 border-emerald-400 p-2 flex flex-col items-center justify-center shadow-sm">
+                  <div class="w-16 h-12 flex items-center justify-center">${getDeviceSVG(mId)}</div>
+                  <span class="mt-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold">✓ Benar</span>
+                </div>
+              `;
+            }
+            return `
+              <div class="rounded-xl border border-dashed border-slate-300 bg-white/60 p-2 flex items-center justify-center text-[11px] font-semibold text-slate-400 min-h-[82px]">
+                Slot ${idx + 1}
+              </div>
+            `;
+          }).join('');
+
+          zone.innerHTML = `
+            <div class="text-center mb-3">
+              <span class="inline-block px-3 py-1 rounded-full bg-${cat.accent}-100 text-${cat.accent}-800 text-xs font-extrabold">${cat.badge}</span>
+              <h3 class="mt-1.5 text-sm sm:text-base font-extrabold text-slate-800">${cat.title}</h3>
+              <p class="text-xs text-slate-500">${cat.subtitle}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2.5 flex-1">
+              ${slotsHTML}
+            </div>
+          `;
+
+          bindDropZoneEvents(zone, cat.id);
+          container.appendChild(zone);
+        });
+
+      } else if (gameState.stage === 4) {
+        // Stage 4: 3 Kolom Besar (Input, Proses, Output)
+        container.className = 'flex-1 grid grid-cols-1 md:grid-cols-3 gap-3';
+
+        const categories = [
+          {
+            id: 'input',
+            title: 'PERANGKAT INPUT',
+            subtitle: 'Memasukkan data & perintah ke sistem',
+            badge: '⌨️ INPUT',
+            accent: 'sky',
+            matchedIds: STAGE4_IDS.filter(id => DEVICES[id].ipo === 'input' && !gameState.remainingCards.includes(id))
+          },
+          {
+            id: 'proses',
+            title: 'PERANGKAT PROSES',
+            subtitle: 'Mengolah & menyimpan data di sistem',
+            badge: '⚙️ PROSES',
+            accent: 'indigo',
+            matchedIds: STAGE4_IDS.filter(id => DEVICES[id].ipo === 'proses' && !gameState.remainingCards.includes(id))
+          },
+          {
+            id: 'output',
+            title: 'PERANGKAT OUTPUT',
+            subtitle: 'Menampilkan hasil pengolahan informasi',
+            badge: '🖥️ OUTPUT',
+            accent: 'teal',
+            matchedIds: STAGE4_IDS.filter(id => DEVICES[id].ipo === 'output' && !gameState.remainingCards.includes(id))
+          }
+        ];
+
+        categories.forEach((cat) => {
+          let hintClass = '';
+          if (gameState.activeHint) {
+            hintClass = gameState.activeHint.allowedZoneIds.includes(cat.id)
+              ? 'hint-zone-active'
+              : 'hint-zone-dimmed';
+          }
+
+          const zone = document.createElement('div');
+          zone.dataset.zoneId = cat.id;
+          zone.className = [
+            'drop-zone rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/90 p-3 flex flex-col justify-between min-h-[210px] cursor-pointer',
+            hintClass
+          ].join(' ');
+
+          const slotsHTML = Array.from({ length: 4 }, (_, idx) => {
+            const mId = cat.matchedIds[idx];
+            if (mId) {
+              return `
+                <div class="animate-correct-pop rounded-xl bg-emerald-50 border-2 border-emerald-400 p-1.5 flex flex-col items-center justify-center shadow-sm">
+                  <div class="w-14 h-11 flex items-center justify-center">${getDeviceSVG(mId)}</div>
+                  <span class="mt-0.5 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold">✓ Benar</span>
+                </div>
+              `;
+            }
+            return `
+              <div class="rounded-xl border border-dashed border-slate-300 bg-white/60 p-2 flex items-center justify-center text-[10px] font-semibold text-slate-400 min-h-[76px]">
+                Slot ${idx + 1}
+              </div>
+            `;
+          }).join('');
+
+          zone.innerHTML = `
+            <div class="text-center mb-2.5">
+              <span class="inline-block px-2.5 py-0.5 rounded-full bg-${cat.accent}-100 text-${cat.accent}-800 text-xs font-extrabold">${cat.badge}</span>
+              <h3 class="mt-1 text-xs sm:text-sm font-extrabold text-slate-800">${cat.title}</h3>
+              <p class="text-[11px] text-slate-500">${cat.subtitle}</p>
+            </div>
+            <div class="grid grid-cols-2 gap-2 flex-1">
+              ${slotsHTML}
+            </div>
+          `;
+
+          bindDropZoneEvents(zone, cat.id);
+          container.appendChild(zone);
+        });
+      }
+    }
+
+    function bindDropZoneEvents(zoneEl, zoneId) {
+      zoneEl.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        zoneEl.classList.add('drag-over');
+      });
+
+      zoneEl.addEventListener('dragleave', () => {
+        zoneEl.classList.remove('drag-over');
+      });
+
+      zoneEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        zoneEl.classList.remove('drag-over');
+        const cardId = e.dataTransfer.getData('text/plain') || gameState.selectedCardId;
+        if (cardId) {
+          handleCardDrop(cardId, zoneId, zoneEl);
+        }
+      });
+
+      // Dukungan tap-to-drop setelah kartu dipilih
+      zoneEl.addEventListener('click', () => {
+        if (gameState.selectedCardId) {
+          handleCardDrop(gameState.selectedCardId, zoneId, zoneEl);
+        }
+      });
+    }
+
+    /**
+     * 10. VALIDASI JAWABAN & KEMBALIKAN KARTU JIKA SALAH
+     */
+    function getCorrectZoneForCard(cardId) {
+      const dev = DEVICES[cardId];
+      if (gameState.stage === 1 || gameState.stage === 2) return cardId;
+      if (gameState.stage === 3) return dev.type;
+      if (gameState.stage === 4) return dev.ipo;
+      return null;
+    }
+
+    function handleCardDrop(cardId, targetZoneId, zoneEl) {
+      if (!gameState.remainingCards.includes(cardId)) return;
+
+      const correctZoneId = getCorrectZoneForCard(cardId);
+      const device = DEVICES[cardId];
+
+      if (targetZoneId === correctZoneId) {
+        // JAWABAN BENAR!
+        playSound('correct');
+        gameState.remainingCards = gameState.remainingCards.filter(id => id !== cardId);
+        gameState.matchedCount++;
+        gameState.selectedCardId = null;
+
+        // Hapus sorotan bantuan jika kartu bantuan berhasil dijawab
+        if (gameState.activeHint && gameState.activeHint.cardId === cardId) {
+          gameState.activeHint = null;
+        }
+
+        updateScore(100);
+        updateStageProgress();
+
+        const praise = PRAISE_MESSAGES[Math.floor(Math.random() * PRAISE_MESSAGES.length)];
+        setFeedback('correct', `${praise} (+100 Poin)`, `${device.name}: ${device.func}`);
+
+        renderDeck();
+        renderDropZones();
+        triggerMiniConfetti();
+
+        // Cek apakah seluruh kartu di stage ini telah selesai
+        if (gameState.remainingCards.length === 0) {
+          handleStageComplete();
+        }
+      } else {
+        // JAWABAN SALAH -> Kartu otomatis kembali ke kolom/dek asal!
+        playSound('wrong');
+        gameState.lives--;
+        gameState.selectedCardId = null;
+        renderLives();
+
+        // Animasi getar pada zona & kartu di dek asal
+        if (zoneEl) {
+          zoneEl.classList.add('animate-wrong-return');
+          setTimeout(() => zoneEl.classList.remove('animate-wrong-return'), 500);
+        }
+
+        renderDeck();
+        const returnedCard = document.querySelector(`[data-card-id="${cardId}"]`);
+        if (returnedCard) {
+          returnedCard.classList.add('animate-wrong-return');
+          setTimeout(() => returnedCard.classList.remove('animate-wrong-return'), 550);
+        }
+
+        const enc = ENCOURAGE_MESSAGES[Math.floor(Math.random() * ENCOURAGE_MESSAGES.length)];
+        setFeedback(
+          'wrong',
+          `${enc} (-1 Nyawa ❤️)`,
+          'Kartu dikembalikan ke dek asal. Perhatikan gambar & petunjuk tujuan dengan teliti!'
+        );
+
+        if (gameState.lives <= 0) {
+          clearInterval(gameState.timerInterval);
+          setTimeout(() => {
+            endGame(false, 'Kesempatan nyawamu telah habis. Ayo pelajari kembali perangkat komputer dan coba lagi!');
+          }, 450);
+        }
+      }
+    }
+
+    /**
+     * 11. PENYELESAIAN STAGE & BONUS +1 NYAWA PADA STAGE 1 & 2
+     */
+    function handleStageComplete() {
+      clearInterval(gameState.timerInterval);
+
+      if (gameState.stage < 4) {
+        playSound('stageUp');
+        triggerBigConfetti();
+
+        const modal = document.getElementById('stage-modal');
+        const title = document.getElementById('stage-modal-title');
+        const desc = document.getElementById('stage-modal-desc');
+        const bonusPill = document.getElementById('stage-bonus-pill');
+        const nextBtn = document.getElementById('btn-next-stage');
+
+        title.textContent = `Stage ${gameState.stage} Berhasil Diselesaikan!`;
+
+        // Aturan #2: Saat menyelesaikan stage 1 dan 2 berikan 1 nyawa tambahan
+        if (gameState.stage === 1 || gameState.stage === 2) {
+          gameState.lives++;
+          renderLives();
+          bonusPill.classList.remove('hidden');
+          desc.textContent = `Luar biasa, ${gameState.playerName}! Kamu mendapat +1 Nyawa Tambahan untuk menghadapi Stage ${gameState.stage + 1}.`;
+        } else {
+          bonusPill.classList.add('hidden');
+          desc.textContent = `Mantap, ${gameState.playerName}! Bersiaplah untuk tantangan terakhir di Stage ${gameState.stage + 1}.`;
+        }
+
+        nextBtn.textContent = `Lanjut ke Stage ${gameState.stage + 1} ➡️`;
+        modal.classList.remove('hidden');
+      } else {
+        // Seluruh 4 Stage Selesai!
+        playSound('win');
+        triggerBigConfetti();
+        const timeBonus = gameState.timeLeft * 5;
+        updateScore(timeBonus);
+        endGame(
+          true,
+          `Selamat ${gameState.playerName}! Semua 4 Stage berhasil ditaklukkan dengan bonus sisa waktu +${timeBonus} poin!`
+        );
+      }
+    }
+
+    document.getElementById('btn-next-stage').addEventListener('click', () => {
+      document.getElementById('stage-modal').classList.add('hidden');
+      loadStage(gameState.stage + 1);
+      setFeedback('neutral', `Stage ${gameState.stage} Dimulai!`, 'Ayo selesaikan tantangan berikutnya sebelum waktu habis.');
+      startTimer();
+    });
+
+    function endGame(isWin, subtitleText) {
+      clearInterval(gameState.timerInterval);
+      const modal = document.getElementById('end-modal');
+      const icon = document.getElementById('end-modal-icon');
+      const title = document.getElementById('end-modal-title');
+      const subtitle = document.getElementById('end-modal-subtitle');
+
+      if (isWin) {
+        icon.textContent = '🏆';
+        icon.className = 'w-20 h-20 mx-auto rounded-3xl bg-amber-100 text-amber-500 flex items-center justify-center text-4xl shadow-md mb-4';
+        title.textContent = `Selamat, ${gameState.playerName}!`;
+      } else {
+        icon.textContent = '⏰';
+        icon.className = 'w-20 h-20 mx-auto rounded-3xl bg-rose-100 text-rose-500 flex items-center justify-center text-4xl shadow-md mb-4';
+        title.textContent = 'Permainan Berakhir';
+      }
+
+      subtitle.textContent = subtitleText;
+      document.getElementById('end-score').textContent = gameState.score;
+      document.getElementById('end-lives').textContent = `${Math.max(0, gameState.lives)} ❤️`;
+      document.getElementById('end-time').textContent = formatTime(Math.max(0, gameState.timeLeft));
+
+      modal.classList.remove('hidden');
+    }
+
+    /**
+     * 12. DUA BANTUAN (LIFELINES) — MASING-MASING 1X PAKAI
+     */
+    // Bantuan A: Memilih di antara 2 pilihan (1 jawaban yang benar)
+    document.getElementById('btn-hint-5050').addEventListener('click', () => {
+      if (gameState.usedHint5050 || gameState.remainingCards.length === 0) return;
+
+      gameState.usedHint5050 = true;
+      const btn = document.getElementById('btn-hint-5050');
+      btn.disabled = true;
+      btn.className = 'px-2.5 py-1.5 rounded-xl bg-slate-200 border border-slate-300 text-slate-400 text-xs font-extrabold flex items-center gap-1.5 cursor-not-allowed opacity-70';
+
+      // Pilih kartu yang sedang dipilih pemain atau kartu pertama di dek
+      const targetCardId = (gameState.selectedCardId && gameState.remainingCards.includes(gameState.selectedCardId))
+        ? gameState.selectedCardId
+        : gameState.remainingCards[0];
+
+      const correctZone = getCorrectZoneForCard(targetCardId);
+
+      // Kumpulkan daftar zona lain yang belum terisi sebagai 1 pengecoh
+      let candidateDecoys = [];
+      if (gameState.stage === 1 || gameState.stage === 2) {
+        candidateDecoys = gameState.remainingCards.filter(id => id !== correctZone);
+      } else if (gameState.stage === 3) {
+        candidateDecoys = ['software', 'hardware'].filter(id => id !== correctZone);
+      } else if (gameState.stage === 4) {
+        candidateDecoys = ['input', 'proses', 'output'].filter(id => id !== correctZone);
+      }
+
+      const decoyZone = candidateDecoys.length > 0
+        ? candidateDecoys[Math.floor(Math.random() * candidateDecoys.length)]
+        : correctZone;
+
+      gameState.activeHint = {
+        cardId: targetCardId,
+        allowedZoneIds: [correctZone, decoyZone]
+      };
+      gameState.selectedCardId = targetCardId;
+
+      playSound('hint');
+      setFeedback(
+        'hint',
+        '🎯 Bantuan 2 Pilihan Aktif!',
+        'Tarik kartu bertanda ⭐ Bantuan ke salah satu dari 2 kotak kuning yang menyala (1 jawaban benar).'
+      );
+
+      renderDeck();
+      renderDropZones();
+    });
+
+    // Bantuan B: Memperpanjang waktu 30 detik
+    document.getElementById('btn-hint-time').addEventListener('click', () => {
+      if (gameState.usedHintTime) return;
+
+      gameState.usedHintTime = true;
+      const btn = document.getElementById('btn-hint-time');
+      btn.disabled = true;
+      btn.className = 'px-2.5 py-1.5 rounded-xl bg-slate-200 border border-slate-300 text-slate-400 text-xs font-extrabold flex items-center gap-1.5 cursor-not-allowed opacity-70';
+
+      gameState.timeLeft += 30;
+      renderTimer();
+      playSound('hint');
+      triggerMiniConfetti();
+
+      setFeedback(
+        'hint',
+        '⏳ Waktu Diperpanjang +30 Detik!',
+        `Sisa waktumu sekarang menjadi ${formatTime(gameState.timeLeft)}. Manfaatkan dengan baik!`
+      );
+    });
+
+    /**
+     * 13. TOUCH DRAG & DROP UNTUK LAYAR SENTUH (MOBILE / TABLET)
+     */
+    function setupTouchDrag(cardEl, cardId) {
+      const ghost = document.getElementById('touch-ghost');
+      let isDraggingTouch = false;
+
+      cardEl.addEventListener('touchstart', (e) => {
+        if (e.touches.length !== 1) return;
+        isDraggingTouch = true;
+        const touch = e.touches[0];
+
+        ghost.innerHTML = `<div class="w-20 h-16 flex items-center justify-center">${getDeviceSVG(cardId)}</div>`;
+        ghost.style.left = `${touch.clientX}px`;
+        ghost.style.top = `${touch.clientY}px`;
+        ghost.style.display = 'flex';
+        cardEl.classList.add('card-dragging');
+      }, { passive: true });
+
+      cardEl.addEventListener('touchmove', (e) => {
+        if (!isDraggingTouch) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        ghost.style.left = `${touch.clientX}px`;
+        ghost.style.top = `${touch.clientY}px`;
+
+        document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+        const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+        const zone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+        if (zone) zone.classList.add('drag-over');
+      }, { passive: false });
+
+      cardEl.addEventListener('touchend', (e) => {
+        if (!isDraggingTouch) return;
+        isDraggingTouch = false;
+        ghost.style.display = 'none';
+        cardEl.classList.remove('card-dragging');
+        document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('drag-over'));
+
+        const touch = e.changedTouches[0];
+        const elemBelow = document.elementFromPoint(touch.clientX, touch.clientY);
+        const zone = elemBelow ? elemBelow.closest('.drop-zone') : null;
+        if (zone && zone.dataset.zoneId) {
+          handleCardDrop(cardId, zone.dataset.zoneId, zone);
+        }
+      });
+    }
+
+    /**
+     * 14. EVENT LOGIN, MODAL PETUNJUK & KONTROL AUDIO
+     */
+    document.getElementById('login-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const input = document.getElementById('player-name-input');
+      const err = document.getElementById('login-error');
+      const name = input.value.trim();
+
+      if (!name) {
+        err.classList.remove('hidden');
+        input.focus();
+        return;
+      }
+
+      err.classList.add('hidden');
+      startNewGame(name);
+    });
+
+    function startNewGame(name) {
+      gameState.playerName = name;
+      gameState.lives = 3;
+      gameState.score = 0;
+      gameState.timeLeft = 180;
+      gameState.usedHint5050 = false;
+      gameState.usedHintTime = false;
+      gameState.activeHint = null;
+      gameState.selectedCardId = null;
+
+      // Reset tombol bantuan
+      const btn5050 = document.getElementById('btn-hint-5050');
+      btn5050.disabled = false;
+      btn5050.className = 'px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95';
+
+      const btnTime = document.getElementById('btn-hint-time');
+      btnTime.disabled = false;
+      btnTime.className = 'px-2.5 py-1.5 rounded-xl bg-teal-100 hover:bg-teal-200 border border-teal-300 text-teal-900 text-xs font-extrabold flex items-center gap-1.5 shadow-sm transition active:scale-95';
+
+      document.getElementById('hud-player-name').textContent = name;
+      document.getElementById('hud-avatar').textContent = name.charAt(0).toUpperCase();
+      document.getElementById('hud-score').textContent = '0';
+
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('end-modal').classList.add('hidden');
+      document.getElementById('game-screen').classList.remove('hidden');
+
+      renderLives();
+      setFeedback('neutral', `Selamat Datang, ${name}! 👋`, 'Tarik gambar perangkat komputer dari dek atas ke area drop yang tepat.');
+      loadStage(1);
+      startTimer();
+      initAndStartMusic();
+    }
+
+    document.getElementById('btn-restart-game').addEventListener('click', () => {
+      startNewGame(gameState.playerName || 'Pemain');
+    });
+
+    // Modal Petunjuk
+    document.getElementById('btn-open-help').addEventListener('click', () => {
+      document.getElementById('help-modal').classList.remove('hidden');
+    });
+    document.getElementById('btn-close-help').addEventListener('click', () => {
+      document.getElementById('help-modal').classList.add('hidden');
+    });
+    document.getElementById('btn-ok-help').addEventListener('click', () => {
+      document.getElementById('help-modal').classList.add('hidden');
+    });
+
+    // Toggle Musik Latar
+    document.getElementById('btn-toggle-music').addEventListener('click', async (e) => {
+      musicEnabled = !musicEnabled;
+      const btn = e.currentTarget;
+      if (musicEnabled) {
+        btn.textContent = '🎵';
+        btn.className = 'w-9 h-9 rounded-xl bg-indigo-100 hover:bg-indigo-200 text-indigo-700 text-sm flex items-center justify-center transition';
+        await initAndStartMusic();
+      } else {
+        btn.textContent = '🔇';
+        btn.className = 'w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-400 text-sm flex items-center justify-center transition';
+        stopBgmScheduler();
+      }
+    });
+
+    // Toggle Efek Suara
+    document.getElementById('btn-toggle-sound').addEventListener('click', (e) => {
+      soundEnabled = !soundEnabled;
+      e.currentTarget.textContent = soundEnabled ? '🔊' : '🔈';
+    });
+
+    /**
+     * 15. ANIMASI BACKGROUND TEKNOLOGI INTERAKTIF & KONFETI (CANVAS 2D)
+     */
+    function initAnimatedBackground() {
+      const bgCanvas = document.getElementById('bg-canvas');
+      const ctx = bgCanvas.getContext('2d');
+      let width = (bgCanvas.width = window.innerWidth);
+      let height = (bgCanvas.height = window.innerHeight);
+
+      window.addEventListener('resize', () => {
+        width = bgCanvas.width = window.innerWidth;
+        height = bgCanvas.height = window.innerHeight;
+      });
+
+      const pointer = { x: width / 2, y: height / 2 };
+      window.addEventListener('mousemove', (e) => {
+        pointer.x = e.clientX;
+        pointer.y = e.clientY;
+      });
+
+      const techTags = ['01', '10', 'CPU', 'RAM', 'SSD', 'I/O', '⚡', '💻'];
+      const count = Math.min(40, Math.floor((width * height) / 28000));
+      const nodes = Array.from({ length: count }, (_, idx) => ({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        vx: (Math.random() - 0.5) * 0.6,
+        vy: (Math.random() - 0.5) * 0.6,
+        r: 2 + Math.random() * 2.5,
+        tag: idx % 5 === 0 ? techTags[idx % techTags.length] : null,
+        phase: Math.random() * Math.PI * 2
+      }));
+
+      // Paket pulsa data bercahaya yang melintas di jalur sirkuit
+      const pulses = Array.from({ length: 14 }, () => ({
+        x: Math.random() * width,
+        y: Math.floor(Math.random() * 20) * 46,
+        speed: 1.5 + Math.random() * 2.2,
+        horizontal: Math.random() > 0.4
+      }));
+
+      let t = 0;
+      function animateBg() {
+        t += 0.012;
+        ctx.clearRect(0, 0, width, height);
+
+        // Aurora cahaya lembut bergerak
+        const g1 = ctx.createRadialGradient(
+          width * (0.25 + Math.sin(t * 0.5) * 0.08),
+          height * (0.3 + Math.cos(t * 0.4) * 0.08),
+          20,
+          width * 0.3,
+          height * 0.3,
+          Math.max(width, height) * 0.55
+        );
+        g1.addColorStop(0, 'rgba(56, 189, 248, 0.18)');
+        g1.addColorStop(1, 'rgba(15, 23, 42, 0)');
+        ctx.fillStyle = g1;
+        ctx.fillRect(0, 0, width, height);
+
+        const g2 = ctx.createRadialGradient(
+          width * (0.78 + Math.cos(t * 0.5) * 0.08),
+          height * (0.72 + Math.sin(t * 0.6) * 0.08),
+          20,
+          width * 0.75,
+          height * 0.7,
+          Math.max(width, height) * 0.5
+        );
+        g2.addColorStop(0, 'rgba(129, 140, 248, 0.2)');
+        g2.addColorStop(1, 'rgba(15, 23, 42, 0)');
+        ctx.fillStyle = g2;
+        ctx.fillRect(0, 0, width, height);
+
+        // Grid papan sirkuit halus
+        ctx.strokeStyle = 'rgba(148, 163, 184, 0.07)';
+        ctx.lineWidth = 1;
+        const step = 46;
+        const ox = (t * 14) % step;
+        const oy = (t * 14) % step;
+        ctx.beginPath();
+        for (let x = ox; x < width; x += step) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, height);
+        }
+        for (let y = oy; y < height; y += step) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(width, y);
+        }
+        ctx.stroke();
+
+        // Gambar paket data bercahaya di jalur grid
+        pulses.forEach((p) => {
+          if (p.horizontal) {
+            p.x += p.speed;
+            if (p.x > width + 30) {
+              p.x = -30;
+              p.y = Math.random() * height;
+            }
+            const grad = ctx.createLinearGradient(p.x - 24, p.y, p.x, p.y);
+            grad.addColorStop(0, 'rgba(56, 189, 248, 0)');
+            grad.addColorStop(1, 'rgba(56, 189, 248, 0.55)');
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(p.x - 24, p.y);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+          } else {
+            p.y += p.speed;
+            if (p.y > height + 30) {
+              p.y = -30;
+              p.x = Math.random() * width;
+            }
+            const grad = ctx.createLinearGradient(p.x, p.y - 24, p.x, p.y);
+            grad.addColorStop(0, 'rgba(129, 140, 248, 0)');
+            grad.addColorStop(1, 'rgba(129, 140, 248, 0.55)');
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(p.x, p.y - 24);
+            ctx.lineTo(p.x, p.y);
+            ctx.stroke();
+          }
+        });
+
+        // Update & gambar node jaringan
+        for (let i = 0; i < nodes.length; i++) {
+          const n = nodes[i];
+          n.x += n.vx;
+          n.y += n.vy;
+          n.phase += 0.04;
+
+          if (n.x < 0 || n.x > width) n.vx *= -1;
+          if (n.y < 0 || n.y > height) n.vy *= -1;
+
+          for (let j = i + 1; j < nodes.length; j++) {
+            const m = nodes[j];
+            const dist = Math.hypot(n.x - m.x, n.y - m.y);
+            if (dist < 140) {
+              const alpha = (1 - dist / 140) * 0.25;
+              ctx.strokeStyle = `rgba(56, 189, 248, ${alpha})`;
+              ctx.lineWidth = 1;
+              ctx.beginPath();
+              ctx.moveTo(n.x, n.y);
+              ctx.lineTo(m.x, m.y);
+              ctx.stroke();
+            }
+          }
+
+          const pDist = Math.hypot(n.x - pointer.x, n.y - pointer.y);
+          if (pDist < 160) {
+            const alpha = (1 - pDist / 160) * 0.38;
+            ctx.strokeStyle = `rgba(129, 140, 248, ${alpha})`;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(n.x, n.y);
+            ctx.lineTo(pointer.x, pointer.y);
+            ctx.stroke();
+          }
+
+          if (n.tag) {
+            ctx.font = 'bold 11px "JetBrains Mono", monospace';
+            ctx.fillStyle = 'rgba(186, 230, 253, 0.35)';
+            ctx.fillText(n.tag, n.x - 10, n.y + 4);
+          } else {
+            const pulseR = n.r + Math.sin(n.phase) * 0.8;
+            ctx.fillStyle = 'rgba(56, 189, 248, 0.55)';
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, Math.max(1, pulseR), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        requestAnimationFrame(animateBg);
+      }
+
+      animateBg();
+    }
+
+    // Engine Konfeti Selebrasi
+    let confettiParticles = [];
+    function spawnConfetti(count) {
+      const colors = ['#38bdf8', '#818cf8', '#34d399', '#fbbf24', '#f472b6'];
+      for (let i = 0; i < count; i++) {
+        confettiParticles.push({
+          x: window.innerWidth * (0.2 + Math.random() * 0.6),
+          y: window.innerHeight * 0.35,
+          vx: (Math.random() - 0.5) * 10,
+          vy: -4 - Math.random() * 7,
+          size: 5 + Math.random() * 5,
+          color: colors[Math.floor(Math.random() * colors.length)],
+          rot: Math.random() * Math.PI * 2,
+          vRot: (Math.random() - 0.5) * 0.25,
+          life: 70 + Math.random() * 35
+        });
+      }
+    }
+
+    function triggerMiniConfetti() {
+      spawnConfetti(22);
+    }
+
+    function triggerBigConfetti() {
+      spawnConfetti(75);
+    }
+
+    function updateConfettiLoop() {
+      const canvas = document.getElementById('confetti-canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = confettiParticles.length - 1; i >= 0; i--) {
+        const p = confettiParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.28; // gravitasi
+        p.rot += p.vRot;
+        p.life--;
+
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rot);
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = Math.max(0, Math.min(1, p.life / 30));
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        ctx.restore();
+
+        if (p.life <= 0) {
+          confettiParticles.splice(i, 1);
+        }
+      }
+      requestAnimationFrame(updateConfettiLoop);
+    }
+
+    window.onload = function () {
+      initAnimatedBackground();
+      updateConfettiLoop();
+    };
+  </script>
+</body>
+</html>
